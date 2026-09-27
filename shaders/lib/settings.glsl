@@ -347,7 +347,14 @@ const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.
 //
 // Turning this off puts the original SSR back, which is the point - the two are
 // alternatives and the old one is still here.
-#define PATH_TRACER
+//
+// Off by default, deliberately. The tracer is new, it has only ever been run
+// offline, and a stochastic path tracer that is wrong is worse than no path
+// tracer: it is wrong in a way that looks like a lighting bug rather than like
+// a broken shader. It earns the default once it has been looked at in game. The
+// option is still on the settings screen, so ticking it defines PATH_TRACER and
+// switches deferred3 on.
+// #define PATH_TRACER
 // The fraction of the frame the tracer runs at.
 //
 // This is 1.0 and has to stay 1.0. A pass cannot bind targets of two different

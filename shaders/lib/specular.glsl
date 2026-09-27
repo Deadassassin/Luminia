@@ -296,8 +296,8 @@ void DoSpecularReflections(
 
 	// --------------- PATH TRACED REFLECTIONS
 	// The radiance the tracer gathered along a stochastically sampled GGX path,
-	// temporally accumulated in its own pass. This is a replacement for the two
-	// blocks above, not a fourth thing stacked on them.
+	// temporally accumulated in its own pass. This replaces the two blocks above,
+	// which is why they are switched off when PATH_TRACER is on.
 	#ifdef PATH_TRACER
 	if (hasReflections) {
 		// Read at the producer's own uv rather than FragPos.xy. The tracer
@@ -309,14 +309,35 @@ void DoSpecularReflections(
 		// how a screen-space tracer announces that it is guessing.
 		float confidence = texture2D(colortex9, ScreenUV).b;
 
-		// The estimate already carries a Fresnel term per bounce, so it is not
-		// weighted by one again here. What is left to decide is how much of it
-		// to believe, and that is the confidence and the lightmap - the same two
-		// terms the blocks above use, so the tracer fades in exactly where they
-		// would have taken over.
-		float believe = clamp(confidence, 0.0, 1.0) * Lightmap * PT_INTENSITY;
+		// The sky, computed here rather than left to the block above, and that is
+		// the whole reason this function still works with the tracer on.
+		//
+		// The block above is switched off when PATH_TRACER is defined, and the
+		// tracer is in turn gated on hasReflections and on its own confidence.
+		// Without a fallback in between, a surface the tracer could not resolve
+		// would end up with no environment reflection at all - which is a worse
+		// image than the tracer's own noise, and much harder to diagnose because
+		// it looks like a lighting bug rather than a missing fallback.
+		vec3 skyRefl = vec3(0.0);
+		#ifdef OVERWORLD_SHADER
+			skyRefl = (skyCloudsFromTex(L, colortex4).rgb / 30.0) * Metals;
+		#else
+			skyRefl = (skyCloudsFromTexLOD2(L, colortex4, sqrt(Roughness) * 6.0).rgb / 30.0) * Metals;
+		#endif
+		vec3 withSky = lerp(Output, skyRefl, Lightmap * RayContribution);
 
-		Final_Reflection = lerp(Output, max(traced.rgb, vec3(0.0)) * Metals, clamp(believe, 0.0, 1.0));
+		// A target the tracer never wrote does not read as zero, it reads as
+		// whatever was in it. The history length is only ever written next to a
+		// real estimate, so it is what says whether there is anything here to
+		// believe at all.
+		float have = step(1.0 / 255.0, traced.a);
+
+		// The estimate already carries a Fresnel term per bounce, so it is not
+		// weighted by one again. What is left is how much of it to believe:
+		// the tracer's own confidence, the lightmap, and whether it ran.
+		float believe = clamp(confidence, 0.0, 1.0) * Lightmap * PT_INTENSITY * have;
+
+		Final_Reflection = lerp(withSky, max(traced.rgb, vec3(0.0)) * Metals, clamp(believe, 0.0, 1.0));
 	}
 	#endif
 
