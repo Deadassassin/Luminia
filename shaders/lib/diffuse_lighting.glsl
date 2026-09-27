@@ -35,7 +35,23 @@ vec3 doBlockLightLighting(
     
     vec3 blockLight = lightColor * lightmapCurve; //;
     
-    #if defined IS_LPV_ENABLED && defined MC_GL_EXT_shader_image_load_store
+    // The volume's contribution to block light.
+    //
+    // This used to read
+    //     #if defined IS_LPV_ENABLED && defined MC_GL_EXT_shader_image_load_store
+    // and the second half of that can never be true on this engine. Its macro
+    // set is MC_GL_VERSION, MC_GL_VENDOR_* and MC_GL_RENDERER_*; there is no
+    // MC_GL_EXT_shader_image_load_store in it, and nothing in the pack defines
+    // it either. So the condition was always false and the volume was never
+    // sampled here, however live it was.
+    //
+    // It was redundant besides. IS_LPV_ENABLED is itself `#ifdef LPV_ENABLED`
+    // plus `#ifdef IRIS_FEATURE_CUSTOM_IMAGES`, and "can I read a custom image"
+    // is exactly what that second flag means. The engine does provide it - it
+    // is in EngineDefines - and the volumes are bound: the engine lists
+    // texLpv1 and texLpv2 among the samplers the chain reads, and allocates both
+    // as RGBA8 256x256x256 storage volumes.
+    #if defined IS_LPV_ENABLED
         vec4 lpvSample = SampleLpvLinear(lpvPos);
         vec3 lpvBlockLight = GetLpvBlockLight(lpvSample);
 

@@ -129,9 +129,11 @@
 // trust, so the smearing is gone and the bounce survives everywhere the camera is
 // still, which is where a person stops to look at a scene.
 //
-// There is no other coloured indirect light in this pack. The voxel flood fill
-// (LPV) needs a 1D storage image and a compute pass the engine does not run, so
-// it is dead here regardless of what LPV_ENABLED says - see PATHTRACER.md.
+// The voxel flood fill (LPV) is what would give a lamp behind blue glass a blue
+// room: it multiplies light by each block's tint as it travels. It now compiles
+// on this engine, after five separate things were wrong - see PATHTRACER.md.
+// None of it has been run in game yet, so LPV_ENABLED is still off by default;
+// your saved settings already have it on.
 //
 // If the frame rate suffers, this and RAY_COUNT are the first two things to turn
 // down.

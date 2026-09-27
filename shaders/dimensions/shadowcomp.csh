@@ -1,5 +1,19 @@
 #define RENDER_SHADOWCOMP
 
+// The option file, and specifically for IS_LPV_ENABLED.
+//
+// This pass did not include it, and everything below sits inside
+// `#ifdef IS_LPV_ENABLED` - so the entire light propagation volume was compiled
+// out of the one program that performs it. The fragment programs do include
+// settings.glsl and have had the volume live all along, which is why the engine
+// reports texLpv1 and texLpv2 among the samplers the chain reads: the volumes
+// were being sampled, and nothing was ever putting light into them.
+//
+// The engine supplies option *values* to every program, but IS_LPV_ENABLED is a
+// derived macro the pack defines itself, and a program that does not include the
+// file that derives it cannot see it.
+#include "/lib/settings.glsl"
+
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
 #if   LPV_SIZE == 8

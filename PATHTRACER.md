@@ -160,25 +160,63 @@ Three things were wrong with mode 4 as it stood:
   energy a real bounce loses each time it lands reads as though every surface
   were a white card. Default is now 0.5 and the list goes down to 0.0.
 
-### The voxel flood fill is dead here, whatever the option says
+### The voxel flood fill, and the five reasons it did nothing
 
-There is a second coloured-light system, the LPV voxel flood fill, and it cannot
-run on this engine:
+There is a second coloured-light system: the LPV voxel flood fill. It propagates
+light through a 3D volume, multiplying it by each block's tint as it travels —
+which is exactly "a lamp with blue glass over it lights the room blue". It was
+dead here, for five independent reasons, and only the first was visible in the
+log.
 
-- `lib/lpv_blocks.glsl` declares `uimage1D imgBlockData`. Vitrail's bindable
-  sampler shapes are 2D, 2DArray, 2D, MS, MSArray, Cube, CubeArray and their
-  shadow variants — there is no 1D. The engine says so directly:
-  `compute world0/shadowcomp SPIR-V failed: Unsupported texture dimensions '1D'
-  for sampler imgBlockData`
-- The pass that would populate it, `setup.csh`, is skipped entirely: *compute
-  programs skipped, no stage exists for them yet: [setup]*
-- And `shaders.properties` switches both off anyway
-  (`program.world*/setup.enabled = false`, `program.world*/shadowcomp.enabled =
-  false`).
+1. **`imgBlockData` was a 1D storage image.** The bindable sampler shapes are 2D,
+   2DShadow, 2DArray, 2DArrayShadow, 2DMS, 2DMSArray, Cube, CubeShadow,
+   CubeArray, CubeArrayShadow, with any `i`/`u` prefix stripped. There is no 1D,
+   so the compute pass that read it did not compile:
+   `compute world0/shadowcomp SPIR-V failed: Unsupported texture dimensions '1D'
+   for sampler imgBlockData`. This is the only one the engine named.
 
-So `LPV_ENABLED` on the settings screen is a switch for a system that does not
-execute. The `LPV_SIZE`, `LPV_SATURATION` and the rest of that block have no
-effect on this engine.
+   The buffer was never needed. Every entry in it is a compile-time constant
+   chosen by block id, so `ptBlockLightData()` computes the same two packed
+   uints from the id. The 1D shape is now gone from the pack entirely, and
+   `tools/port_lpv_table.py` extracts the table mechanically rather than copying
+   it — a dropped colour constant is a torch that lights a room the wrong colour
+   with nothing to say so.
+
+2. **`setup.csh` cannot run.** The engine skips it: *compute programs skipped, no
+   stage exists for them yet: [setup]*. So even a 2D image would have been
+   written by nothing. It is now an empty stub, since the table needs no pass.
+
+3. **`shadowcomp.csh` never included `lib/settings.glsl`.** Everything in it is
+   inside `#ifdef IS_LPV_ENABLED`, and `IS_LPV_ENABLED` is a derived macro the
+   pack defines *in that file*. The engine supplies option _values_ to every
+   program, but a program that does not include the file deriving the macro
+   cannot see it — so the entire flood fill, 2232 lines, was compiled out of the
+   one program that performs it. This is the reason the engine reported
+   `texLpv1` and `texLpv2` among the samplers the chain reads while nothing was
+   ever putting light into them.
+
+4. **The fragment stage gated the volume read behind a macro the engine does not
+   define.** `doBlockLightLighting` read
+   `#if defined IS_LPV_ENABLED && defined MC_GL_EXT_shader_image_load_store`, and
+   the engine's macro set is `MC_GL_VERSION`, `MC_GL_VENDOR_*` and
+   `MC_GL_RENDERER_*` — there is no `MC_GL_EXT_shader_image_load_store` in it, and
+   nothing in the pack defines it either. The condition was therefore always
+   false, so the volume was never sampled however live it was. It was also
+   redundant: `IS_LPV_ENABLED` already requires `IRIS_FEATURE_CUSTOM_IMAGES`,
+   which means exactly "can I read a custom image", and which this engine does
+   provide.
+
+5. **`LPV_ENABLED` ships commented out.** The settings screen offers it, and the
+   flood fill and its volumes are gated on it, but the pack's own default is off.
+   Your saved settings already have it on, which is why the volumes were allocated
+   and bound at all.
+
+`shadowcomp` was never disabled — `shaders.properties` only disables it in the
+`#else` of `#ifdef LPV_ENABLED`, so with the option on it was being dispatched
+every frame and failing to compile. Fixing the compile was the whole of it.
+
+**Still unverified.** None of this has been run in game. The flood fill is 2232
+lines that have never executed on this engine.
 
 ## Known limits
 

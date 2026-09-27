@@ -164,16 +164,24 @@ def inject_options(source):
 
     prepend = []
     # A live `#define NAME value` or a commented `// #define NAME`.
-    for m in re.finditer(r"^[ \t]*(?://[ \t]*)?#define[ \t]+([A-Z][A-Z0-9_]*)[ \t]*(.*)$",
+    #
+    # The name pattern has to admit lowercase. This pack mixes cases inside its
+    # identifiers - Dirt_Amount, Vanilla_like_water, Dirt_Scatter_R - so an
+    # upper-case-only class captures `D` and leaves `irt_Amount 0.14 ...` as the
+    # value, which then redefines a one-letter macro. The engine says the same
+    # thing from the other end: it reports "settings differing only by case"
+    # for exactly this reason.
+    for m in re.finditer(r"^[ \t]*(?://[ \t]*)?#[ \t]*define[ \t]+"
+                         r"([A-Za-z_][A-Za-z0-9_]*)[ \t]*([^/\n]*)",
                          settings, re.M):
         name, value = m.group(1), m.group(2)
         if name in ("SHADER_VERSION_LABEL",):
             continue
-        declared = re.search(r"^[ \t]*(?://[ \t]*)?#define[ \t]+%s\b[^\n]*$" % re.escape(name),
-                             source, re.M)
+        declared = re.search(r"^[ \t]*(?://[ \t]*)?#[ \t]*define[ \t]+%s\b[^\n]*$"
+                             % re.escape(name), source, re.M)
         if declared:
-            repl = "#define %s%s" % (name, (" " + value.strip()) if value.strip() else "")
-            source = source[:declared.start()] + repl + source[declared.end():]
+            source = source[:declared.start()] + repl_of(name, value) \
+                + source[declared.end():]
         elif not re.search(r"\b%s\b" % re.escape(name), source):
             # Only worth defining if the program actually mentions it.
             prepend.append(repl_of(name, value))
@@ -182,7 +190,10 @@ def inject_options(source):
 
 
 def repl_of(name, value):
-    return "#define %s%s" % (name, (" " + value.strip()) if value.strip() else "")
+    # The trailing `// [ ... ]` value lists the pack writes on an option line are
+    # for the settings screen, not part of the value, so they are dropped here.
+    value = value.strip()
+    return "#define %s%s" % (name, (" " + value) if value else "")
 
 
 def stand_in_for_loader(source, stage):
