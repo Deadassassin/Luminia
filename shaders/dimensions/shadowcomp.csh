@@ -71,7 +71,7 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
         uint blockId = voxelSharedData[shared_index];
         
         if (blockId > 0 && blockId != BLOCK_EMPTY) {
-            uvec2 blockData = imageLoad(imgBlockData, int(blockId)).rg;
+            uvec2 blockData = ptBlockLightData(int(blockId));
             mask = (blockData.g >> 24) & 0xFFFF;
         }
 
@@ -128,7 +128,7 @@ void main() {
         uint blockId = voxelSharedData[getSharedIndex(ivec3(gl_LocalInvocationID) + 1)];
 
         if (blockId > 0u) {
-            uvec2 blockData = imageLoad(imgBlockData, int(blockId)).rg;
+            uvec2 blockData = ptBlockLightData(int(blockId));
             vec4 lightColorRange = unpackUnorm4x8(blockData.r);
             lightColor = srgbToLinear(lightColorRange.rgb);
             lightRange = lightColorRange.a * 255.0;

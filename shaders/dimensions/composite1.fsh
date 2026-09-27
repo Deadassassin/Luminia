@@ -86,7 +86,7 @@ uniform sampler2D colortex14;
 uniform sampler2D colortex15; // flat normals(rgb), vanillaAO(alpha)
 
 #ifdef IS_LPV_ENABLED
-	uniform usampler1D texBlockData;
+	// (texBlockData is gone: the per-block light table is a function now)
 	uniform sampler3D texLpv1;
 	uniform sampler3D texLpv2;
 #endif

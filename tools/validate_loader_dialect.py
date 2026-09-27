@@ -54,6 +54,13 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 SHADERS = os.path.join(ROOT, "shaders")
 
+# What the loader emits, per stage. The pack writes its stages without a version
+# and the engine supplies one, so a compute stage has to be compiled above 430 for
+# imageLoad/imageStore and the packing intrinsics to exist at all - none of which
+# are in the 130 the fragment and vertex stages are checked at.
+TARGET = "#version 130"
+TARGET_COMPUTE = "#version 460 core"
+
 INCLUDE_RE = re.compile(r'^\s*#include\s+[<"]([^>"]+)[>"]')
 
 # Vitrail's rename table, from dev/vitrail/glsl/LegacyGlsl. Applied longest
@@ -133,19 +140,69 @@ def expand(path, seen=None):
     return "\n".join(out)
 
 
+def inject_options(source):
+    """Define every pack option in the unit, the way the engine does.
+
+    This matters more than it looks. The pack declares its options in
+    lib/settings.glsl, but not every program includes that file - the compute
+    stages do not - so the engine supplies the option values to every program
+    itself. A harness that does not leaves every option-gated block out of the
+    compile, and this pack is almost entirely option-gated: LPV_ENABLED ships
+    commented out, so without this the whole light-propagation volume, which is
+    the largest single body of code in the pack, was never being compiled at all.
+
+    Commented-out options are injected too. The settings screen offers them, so a
+    player can turn any of them on, and code behind one has to compile whether or
+    not it happens to be the default.
+
+    Where the pack declares the option itself the declaration is rewritten, since
+    two #defines of one name with different values is an error. Where it does not,
+    the definition is prepended, which is what the engine does.
+    """
+    with open(os.path.join(SHADERS, "lib", "settings.glsl"), "r", encoding="utf-8") as f:
+        settings = f.read()
+
+    prepend = []
+    # A live `#define NAME value` or a commented `// #define NAME`.
+    for m in re.finditer(r"^[ \t]*(?://[ \t]*)?#define[ \t]+([A-Z][A-Z0-9_]*)[ \t]*(.*)$",
+                         settings, re.M):
+        name, value = m.group(1), m.group(2)
+        if name in ("SHADER_VERSION_LABEL",):
+            continue
+        declared = re.search(r"^[ \t]*(?://[ \t]*)?#define[ \t]+%s\b[^\n]*$" % re.escape(name),
+                             source, re.M)
+        if declared:
+            repl = "#define %s%s" % (name, (" " + value.strip()) if value.strip() else "")
+            source = source[:declared.start()] + repl + source[declared.end():]
+        elif not re.search(r"\b%s\b" % re.escape(name), source):
+            # Only worth defining if the program actually mentions it.
+            prepend.append(repl_of(name, value))
+
+    return "\n".join(prepend) + ("\n" if prepend else "") + source
+
+
+def repl_of(name, value):
+    return "#define %s%s" % (name, (" " + value.strip()) if value.strip() else "")
+
+
 def stand_in_for_loader(source, stage):
     """Apply the engine's rewrites the way it applies them."""
     body = "\n".join(l for l in source.split("\n")
                      if not l.lstrip().startswith("#version"))
-    body = re.sub(r"\bvarying\b", "out" if stage == "vert" else "in", body)
+    if stage != "comp":
+        # A compute stage has no interpolants, and hoisting `varying` into it
+        # would be wrong rather than merely redundant.
+        body = re.sub(r"\bvarying\b", "out" if stage == "vert" else "in", body)
     for old, new in RENAMES:
         body = re.sub(r"\b%s\b" % old, new, body)
-    return "\n".join([TARGET, SUPPLIED, body])
+    target = TARGET_COMPUTE if stage == "comp" else TARGET
+    supplied = "" if stage == "comp" else SUPPLIED
+    return "\n".join([target, supplied, inject_options(body)])
 
 
 def programs():
     for name in sorted(os.listdir(os.path.join(SHADERS, "dimensions"))):
-        for ext, stage in ((".fsh", "frag"), (".vsh", "vert")):
+        for ext, stage in ((".fsh", "frag"), (".vsh", "vert"), (".csh", "comp")):
             if name.endswith(ext):
                 yield name, os.path.join(SHADERS, "dimensions", name), stage
 

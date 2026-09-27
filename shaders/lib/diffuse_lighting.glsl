@@ -1,11 +1,16 @@
 #ifdef IS_LPV_ENABLED
+    // The per-block light and tint table. This used to be read out of a 1D
+    // storage image, which this engine cannot bind, and which the pass that
+    // populated it never ran anyway - so a held light was being lit with
+    // whatever the buffer happened to contain. It is a function of the id now.
+    #include "/lib/lpv_blocks.glsl"
+
     vec3 GetHandLight(const in int itemId, const in vec3 playerPos, const in vec3 normal) {
         vec3 lightFinal = vec3(0.0);
         vec3 lightColor = vec3(0.0);
         float lightRange = 0.0;
 
-        uvec2 blockData = texelFetch(texBlockData, itemId, 0).rg;
-        vec4 lightColorRange = unpackUnorm4x8(blockData.r);
+        vec4 lightColorRange = unpackUnorm4x8(ptBlockLightData(itemId).r);
         lightColor = srgbToLinear(lightColorRange.rgb);
         lightRange = lightColorRange.a * 255.0;
 
