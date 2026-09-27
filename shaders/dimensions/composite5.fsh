@@ -10,8 +10,8 @@ const int colortex4Format = RGBA16F;				// light values and skyboxes (everything
 const int colortex6Format = R11F_G11F_B10F;			// additionnal buffer for bloom (composite3->final)
 const int colortex7Format = RGBA8;					// Final output, transparencies id (gbuffer->composite4)
 const int colortex8Format = RGBA8;					// Specular Texture
-const int colortex9Format = RGBA8;					// rain in alpha
-const int colortex10Format = RGBA16;				// resourcepack Skies
+const int colortex9Format = RGBA16F;				// path tracer: scene depth, luminance, hit confidence
+const int colortex10Format = RGBA16F;				// path tracer: accumulated radiance + history length
 const int colortex11Format = RGBA16; 				// unchanged translucents albedo, alpha and tangent normals
 const int colortex12Format = RGBA16F;				// DISTANT HORIZONS + VANILLA MIXED DEPTHs
 
@@ -31,7 +31,10 @@ const bool colortex6Clear = false;
 const bool colortex7Clear = false;
 const bool colortex8Clear = false;
 const bool colortex9Clear = true;
-const bool colortex10Clear = true;
+// colortex10 carries the path tracer's running estimate across frames, so it
+// must not be cleared. Everything else here is written in full every frame,
+// which is why clearing them is off.
+const bool colortex10Clear = false;
 const bool colortex11Clear = true;
 const bool colortex12Clear = false;
 const bool colortex13Clear = false;

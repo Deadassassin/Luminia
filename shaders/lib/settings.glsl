@@ -336,6 +336,54 @@ const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.
 	#define LIGHTSOURCE_REFLECTION
 #endif
 
+///////
+// ----- PATH TRACER ----- //////
+
+// A stochastic path tracer, run in one pass before the lighting pass and
+// resolved into it. It replaces the single-bounce SSR above rather than adding
+// to it: the old march aims one mirror direction and calls the result a
+// reflection, which is why a rough floor looked like grey plastic and a
+// scratched metal block looked like a mirror.
+//
+// Turning this off puts the original SSR back, which is the point - the two are
+// alternatives and the old one is still here.
+#define PATH_TRACER
+// The fraction of the frame the tracer runs at. Half is the default because a
+// stochastic estimate is noisy enough that the resolution loss is not what you
+// notice, and quarter is a third of the samples for the same amount of time.
+#define PT_SCALE 0.5 // [0.25 0.5 1.0]
+// Depth samples per ray. The single biggest cost in the pass, and the first
+// thing to turn down.
+#define PT_STEPS 24 // [8 12 16 20 24 32 40 48 64]
+// Segments in a path. Each one after the first is Russian-roulette terminated,
+// so the cost does not scale with this the way the first bounce does.
+#define PT_BOUNCES 2 // [1 2 3]
+// How far a ray may travel, in blocks. Beyond this the depth buffer has too
+// little precision left to say what it hit, so a longer ray is not a longer
+// reflection, it is a wrong one.
+#define PT_MAX_DISTANCE 64.0 // [16 32 48 64 96 128 192]
+// How far behind a surface a ray may pass before it counts as having hit it.
+// Too small and thin geometry vanishes; too large and a ray reads through a
+// wall it should have stopped at.
+#define PT_THICKNESS 0.35 // [0.1 0.2 0.35 0.5 0.75 1.0 1.5 2.0]
+// How many frames the estimate averages over before it stops getting better.
+// The noise falls as 1/N, so past this the image is smoother than it needs to
+// be and responds to a moving highlight too slowly.
+#define PT_MAX_FRAMES 24.0 // [4 8 12 16 24 32 48 64]
+// How many standard deviations of the neighbourhood a previous frame's
+// estimate may be this far from the current one before it is clipped back. This
+// is the entire anti-ghosting mechanism, and the reason the tracer needs no
+// knowledge of the previous frame's camera.
+#define PT_CLAMP_SIGMA 2.0 // [1.0 1.5 2.0 3.0 4.0 6.0]
+// A relative depth change above this between two frames is a disocclusion, and
+// resets the estimate rather than being averaged through it.
+#define PT_DISOCLUSION 0.15 // [0.02 0.05 0.10 0.15 0.25 0.5]
+// Surfaces rougher than this are not traced at all. Past it the GGX lobe is
+// wider than the screen, so every sample lands somewhere different and the
+// average is noise rather than a reflection.
+#define PT_ROUGHNESS_CUTOFF 0.35 // [0.05 0.1 0.2 0.35 0.5 0.7 1.0]
+#define PT_INTENSITY 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0 3.0 4.0]
+
 #define EMISSIVE_TYPE 1 // [0 1 2 3]
 #define Emissive_Brightness 1.0 // [1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 15.0 20.0 25.0 30.0 35.0 40.0 45.0 50.0 100.]
 #define Emissive_Curve 2.0 // [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]

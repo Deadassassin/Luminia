@@ -451,6 +451,19 @@ screen.Resource_Pack_Support = Resource Pack Support
         option.Sun_specular_Strength = Sun Reflection Multiplier
         option.reflection_quality = SSR Quality
 
+    screen.Path_Tracer = Path Tracer
+        option.PATH_TRACER = Path Tracer
+        option.PT_INTENSITY = Reflection Intensity
+        option.PT_BOUNCES = Bounces
+        option.PT_STEPS = Trace Steps
+        option.PT_SCALE = Resolution
+        option.PT_MAX_DISTANCE = Max Distance
+        option.PT_THICKNESS = Thickness
+        option.PT_MAX_FRAMES = Accumulation Frames
+        option.PT_CLAMP_SIGMA = History Clamp
+        option.PT_DISOCLUSION = Disocclusion Threshold
+        option.PT_ROUGHNESS_CUTOFF = Roughness Cutoff
+
     screen.Emissives = Emissives
         option.Emissive_Brightness = Emission Multiplier
         option.Emissive_Curve = Emission Curve
@@ -570,6 +583,19 @@ screen.Resource_Pack_Support.comment = A handfull of effects that use informatio
         option.Roughness_Threshold.comment = If the roughness reaches this threshold, all reflections except the sun do not render. it can improve performance.
         option.Sun_specular_Strength.comment = Configure how bright the sun's reflection is.
         option.reflection_quality.comment = Configure the quality of the screen-space reflections.
+
+    screen.Path_Tracer.comment = A stochastic path tracer. Each bounce samples the GGX lobe rather than aiming one mirror direction, and the noise is averaged out over several frames. It replaces the screen-space reflections above rather than adding to them. §aPERFORMANCE COST:§r high - start with Lower bounces and Trace Steps if the frame time is wrong.
+        option.PATH_TRACER.comment = Trace reflections through the depth buffer with multiple bounces. Turn this off to go back to the classic screen-space reflections.
+        option.PT_INTENSITY.comment = How strongly the traced reflections are blended in. 1.0 is physically neutral.
+        option.PT_BOUNCES.comment = How many times a ray may bounce before it is discarded. Each extra bounce is another full trace, so this is close to linear in cost.
+        option.PT_STEPS.comment = Depth samples per ray. The single biggest cost in the tracer, and the first thing to lower.
+        option.PT_SCALE.comment = The fraction of the screen the tracer runs at. Also has to match size.buffer for colortex9 and colortex10 in shaders.properties, which tools/check_pt_scale.py verifies.
+        option.PT_MAX_DISTANCE.comment = How far a ray may travel, in blocks. Past this the depth buffer has too little precision left to say what it hit.
+        option.PT_THICKNESS.comment = How far behind a surface a ray may pass and still count as having hit it. Too small and thin geometry vanishes; too large and rays read through walls.
+        option.PT_MAX_FRAMES.comment = How many frames the estimate averages over. Noise falls as 1/N, so a high value is smoother but reacts to a moving highlight more slowly.
+        option.PT_CLAMP_SIGMA.comment = How far a previous frame's estimate may stray from the current neighbourhood before it is clipped back. This is the entire anti-ghosting mechanism.
+        option.PT_DISOCLUSION.comment = A relative depth change above this between two frames counts as a disocclusion, and resets the estimate instead of averaging through it.
+        option.PT_ROUGHNESS_CUTOFF.comment = Surfaces rougher than this are not traced at all. Past it the reflection lobe is wider than the screen and the result is noise.
 
 screen.Subsurface_Scattering.comment = §bWhat is this?§r Sub-surface scattering is what happens when you put a bright light on your hand, and it starts to glow. The sun actually does the same thing to plants, cloth, skin, and other things.
     option.SSS_TYPE.comment = Configure how the sub-surface scattering is applied to the world.  §bHardcoded:§r The shader decides what gets it. §bLabSSS:§r The resourcepack decides what gets it. §aPERFORMANCE COST:§r very low

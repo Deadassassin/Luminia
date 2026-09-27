@@ -74,7 +74,10 @@ uniform sampler2D colortex5; //TAA buffer/previous frame
 uniform sampler2D colortex6; //Noise
 uniform sampler2D colortex7; //water?
 uniform sampler2D colortex8; //Specular
-// uniform sampler2D colortex9; //Specular
+// colortex9 and colortex10 are the path tracer's own pair: the scene depth its
+// estimate was made against, and the estimate itself. Written by deferred3 and
+// read back here, half resolution, so the read is a hardware-filtered upsample.
+uniform sampler2D colortex9;
 uniform sampler2D colortex10;
 uniform sampler2D colortex11;
 uniform sampler2D colortex12;
@@ -1292,7 +1295,7 @@ void main() {
 
 		#ifdef Specular_Reflections	
 			vec2 specularNoises = vec2(noise, R2_dither());
-			DoSpecularReflections(gl_FragData[0].rgb, viewPos, feetPlayerPos_normalized, WsunVec, specularNoises, normal, SpecularTex.r, SpecularTex.g, albedo, DirectLightColor*Shadows*NdotL, lightmap.y, hand);
+			DoSpecularReflections(gl_FragData[0].rgb, viewPos, texcoord, feetPlayerPos_normalized, WsunVec, specularNoises, normal, SpecularTex.r, SpecularTex.g, albedo, DirectLightColor*Shadows*NdotL, lightmap.y, hand);
 		#endif
 		
 		Emission(gl_FragData[0].rgb, albedo, SpecularTex.a, exposure);

@@ -26,12 +26,20 @@ uniform sampler2D colortex14; // Noise
 uniform sampler2D colortex12; // Noise
 uniform sampler2D colortex15; // Noise
 
-uniform sampler2D shadow;
+// These three are declared and never read in this program. They are here
+// because the binding is per pipeline rather than per program, and declaring
+// them with the wrong type is not free: the engine binds shadowtex as a
+// comparison sampler, so a program that declares it as an ordinary sampler2D
+// makes every ordinary read of it in the pipeline undefined. It was reporting
+// "declares shadowtexN as a comparison sampler in one stage and an ordinary one
+// in another" for this file, hundreds of times a frame. shadow2D() below needs
+// the comparison type anyway, so this is what the rest of the pack declares.
+uniform sampler2DShadow shadow;
 
 #ifdef TRANSLUCENT_COLORED_SHADOWS
 	uniform sampler2D shadowcolor0;
-	uniform sampler2D shadowtex0;
-	uniform sampler2D shadowtex1;
+	uniform sampler2DShadow shadowtex0;
+	uniform sampler2DShadow shadowtex1;
 #endif
 
 

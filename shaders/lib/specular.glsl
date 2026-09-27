@@ -181,6 +181,7 @@ void DoSpecularReflections(
 	inout vec3 Output,
 
 	vec3 FragPos, // toScreenspace(vec3(screenUV, depth)
+	vec2 ScreenUV, // the same uv, un-scaled, for reading a pass's own target
 	vec3 WorldPos,
     vec3 LightPos, // should be in world space
     vec2 Noise, // x = bluenoise z = interleaved gradient noise
@@ -240,7 +241,14 @@ void DoSpecularReflections(
 
 	// --------------- BACKGROUND REFLECTIONS
 	// apply background reflections to the final color. make sure it does not exist based on the lightmap
-	#ifdef Sky_reflection
+	// Both of the next two blocks are alternatives to the path tracer rather
+	// than additions to it. Each of them produces the *same* thing the tracer
+	// does - the radiance arriving from the reflection direction - so running
+	// them together would light every reflective surface twice and wash the
+	// image out. The tracer replaces both; the sun's own glint below is kept,
+	// because that is a light source rather than an environment and the tracer
+	// does not model it.
+	#if defined Sky_reflection && !defined PATH_TRACER
 
 		#ifdef OVERWORLD_SHADER
 			if(hasReflections) Background_Reflection = (skyCloudsFromTex(L, colortex4).rgb / 30.0) * Metals ;
@@ -254,7 +262,7 @@ void DoSpecularReflections(
 
 	// --------------- SCREENSPACE REFLECTIONS
 	// apply screenspace reflections to the final color and mask out background reflections.
-	#ifdef Screen_Space_Reflections
+	#if defined Screen_Space_Reflections && !defined PATH_TRACER
 		if(hasReflections){
 			#ifdef Dynamic_SSR_quality
 				float SSR_Quality = lerp(reflection_quality, 6.0, RayContribution); // Scale quality with ray contribution
@@ -284,6 +292,32 @@ void DoSpecularReflections(
 			// occlude the background with the SSR and write to the final color.
 			Final_Reflection = lerp(Final_Reflection, SS_Reflections.rgb, SS_Reflections.a);
 		}
+	#endif
+
+	// --------------- PATH TRACED REFLECTIONS
+	// The radiance the tracer gathered along a stochastically sampled GGX path,
+	// temporally accumulated in its own pass. This is a replacement for the two
+	// blocks above, not a fourth thing stacked on them.
+	#ifdef PATH_TRACER
+	if (hasReflections) {
+		// Read at the producer's own uv rather than FragPos.xy. The tracer
+		// derives its uv from gl_FragCoord the same way this pass does, and the
+		// two agreeing is the only reason this lands on the right pixel.
+		vec4 traced = texture2D(colortex10, ScreenUV);
+		// The tracer's own hit fraction. A pixel where most rays left the screen
+		// is mostly an estimate of the sky, and showing it at full strength is
+		// how a screen-space tracer announces that it is guessing.
+		float confidence = texture2D(colortex9, ScreenUV).b;
+
+		// The estimate already carries a Fresnel term per bounce, so it is not
+		// weighted by one again here. What is left to decide is how much of it
+		// to believe, and that is the confidence and the lightmap - the same two
+		// terms the blocks above use, so the tracer fades in exactly where they
+		// would have taken over.
+		float believe = clamp(confidence, 0.0, 1.0) * Lightmap * PT_INTENSITY;
+
+		Final_Reflection = lerp(Output, max(traced.rgb, vec3(0.0)) * Metals, clamp(believe, 0.0, 1.0));
+	}
 	#endif
 
 	// Final_Reflection = mix(mix(Output,Background_Reflection,Lightmap), SS_Reflections.rgb, SS_Reflections.a) * RayContribution;
