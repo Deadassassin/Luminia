@@ -246,6 +246,60 @@ The flood fill was live in the source all along. The 1D image alone stopped it
 running, and item 4 above is what made what it produced wrong.
 
 
+## Making unlit things actually dark
+
+Two options, and the order to reach for them matters, because one of them looks
+like it should do the job and does not.
+
+**`MIN_LIGHT_AMOUNT` is the switch you want.** Set it to `0.0`. It is on the
+settings screen under *Ambient Colors*, next to `ambient_brightness`.
+
+`doIndirectLighting` in `lib/diffuse_lighting.glsl` adds a floor to every surface
+in the frame, lightmap or not:
+
+```glsl
+indirectLight += minimumLightColor * max(MIN_LIGHT_AMOUNT*0.01, nightVision * 0.1);
+```
+
+`minimumLightColor` is `vec3(1.0)`, and line 927 of `composite1.fsh` raises it by
+up to 70% on surfaces angled towards the player:
+
+```glsl
+MinimumLightColor += 0.7 * MinimumLightColor * dot(slopednormal, feetPlayerPos_normalized);
+```
+
+so the floor is not even on every surface equally — it is strongest on the ground
+you are standing on, which is the thing that reads as "the ground is glowing".
+
+**`ambient_brightness` did not reach that floor, and now it does.** It multiplied
+only the sky-ambient term, so turning it to `0.0` removed the sky contribution and
+left the floor behind — which is a reasonable way to conclude the pack has no
+ambient control when one is right there on the same screen. The floor now answers
+to it as well:
+
+```glsl
+vec3 ambientFloor = minimumLightColor * MIN_LIGHT_AMOUNT * 0.01 * ambient_brightness;
+indirectLight += max(ambientFloor, minimumLightColor * nightVision * 0.1);
+```
+
+Two things about that, deliberately:
+
+- **At the default `ambient_brightness` of 1.0 it is term-for-term identical to
+  what it replaced**, over the whole range of `MIN_LIGHT_AMOUNT` and night vision.
+  Nothing changes until the slider is moved.
+- **Night vision is not scaled.** It is a deliberate see-in-the-dark effect, not
+  ambient, so darkening the world does not also remove the ability to see in it.
+  The `max()` is kept so the two terms stay alternatives rather than summing.
+
+The translucent path already scaled its own floor this way
+(`fogBehindTranslucent_pass.fsh`), so this makes the opaque and translucent halves
+agree rather than inventing a convention for one of them.
+
+There is no lift after the tonemap — `composite1.fsh` ends at
+`(Indirect_lighting + Direct_lighting) * albedo` — so a zero floor really is black
+rather than very dark grey.
+
+
 ## Known limits
 
 - **`POM` cannot compile on this engine.** `all_solid.fsh` and `all_solid.vsh` both

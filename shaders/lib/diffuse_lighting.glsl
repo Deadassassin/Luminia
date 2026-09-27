@@ -91,7 +91,26 @@ vec3 doIndirectLighting(
 
     vec3 indirectLight = lightColor * lightmapCurve * ambient_brightness * 0.7; 
 
-    indirectLight += minimumLightColor * max(MIN_LIGHT_AMOUNT*0.01, nightVision * 0.1);
+    // The floor is light with no source, so it answers to ambient_brightness like
+    // every other such term. It did not, and that is why turning the ambient
+    // slider down left unlit ground still glowing: this was the one addition to
+    // Indirect_lighting that no option reached.
+    //
+    // The translucent path already scales its own floor this way -
+    // fogBehindTranslucent_pass.fsh does `indirectLightColor_dynamic *=
+    // ambient_brightness * ...` - so this makes the two agree rather than
+    // inventing a convention.
+    //
+    // Only the floor term is scaled. Night vision is a deliberate
+    // see-in-the-dark effect rather than ambient, and darkening the world should
+    // not also remove the ability to see in it.
+    //
+    // At the default ambient_brightness of 1.0 this is term-for-term identical to
+    // what it replaced, so nothing changes until the slider is turned down.
+    // MIN_LIGHT_AMOUNT still decides how much floor there is - take it to 0.0 to
+    // have none at all, which is what "no light source, no light" means.
+    vec3 ambientFloor = minimumLightColor * MIN_LIGHT_AMOUNT * 0.01 * ambient_brightness;
+    indirectLight += max(ambientFloor, minimumLightColor * nightVision * 0.1);
 
     return indirectLight;
 }
