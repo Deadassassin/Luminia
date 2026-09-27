@@ -132,16 +132,33 @@ Three things were wrong with mode 4 as it stood:
   top of it.
 - **It sampled the wrong buffer.** `colortex5` is the TAA history, and
   `composite5.fsh` writes it with `fp10Dither()` because the target is
-  `R11F_G11F_B10F`. Reading it pulled a 10-bit triangular dither straight into the
-  indirect term — re-injecting the exact coloured speckle the bounce is meant to
-  remove — and it is already blended against its own history, so a bounce off a
-  moving light smeared along its path. It now reads `colortex3`, the lit scene
-  the lighting pass wrote, undithered.
+  `R11F_G11F_B10F`. That is not the defect it looks like, though — see the trap
+  below. The real problem was the reprojection, not the buffer.
+- **It sampled a buffer that only looks like the lit scene.** An attempt to
+  "fix" the dither by reading `colortex3` instead made it dramatically worse, and
+  the reason is worth writing down. `colortex3` *is* what the lighting pass
+  writes, and `composite5.fsh` reads it as "the current frame" — so it reads as
+  the lit scene. But `dimensions/composite.fsh` runs immediately before the
+  lighting pass and overwrites `colortex3` with the **variable-penumbra shadow
+  buffer**: `minshadowfilt` in red, average depth in green, blocker count in
+  blue. Read from inside the lighting pass, that is what arrives. Adding it to
+  the indirect term is nonsense, and it presents as a wildly over-bright,
+  wrongly-tinted bounce — which is exactly how it looked.
+
+  `colortex5` is the TAA resolve's output, i.e. the previous frame's lit scene,
+  and it is the correct source. It is 10-bit and dithered, but the dither is half
+  a code value and is averaged over `RAY_COUNT` rays and the TAA blend on top, so
+  it does not survive into the result as noise.
 - **The ghosting was accepted rather than suppressed.** Mode 4 was avoided
   because on a fast turn the reprojection is wrong for a frame or two, and the
   pack shipped 3 to avoid it. The bounce now fades out as the camera moves
   instead of trusting a reprojection it knows is bad, so it survives where the
   camera is still — which is where someone stops to look at a scene.
+- **It was too strong, and could not be turned down.** `GI_Strength` defaulted to
+  1.0 and its value list started at 1.0, so the bounce could only be added to
+  the scene, never scaled back. A single-bounce estimate that does not model the
+  energy a real bounce loses each time it lands reads as though every surface
+  were a white card. Default is now 0.5 and the list goes down to 0.0.
 
 ### The voxel flood fill is dead here, whatever the option says
 
