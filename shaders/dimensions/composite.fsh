@@ -26,15 +26,29 @@ uniform sampler2D colortex14; // Noise
 uniform sampler2D colortex12; // Noise
 uniform sampler2D colortex15; // Noise
 
-// These three are declared and never read in this program. They are here
-// because the binding is per pipeline rather than per program, and declaring
-// them with the wrong type is not free: the engine binds shadowtex as a
-// comparison sampler, so a program that declares it as an ordinary sampler2D
-// makes every ordinary read of it in the pipeline undefined. It was reporting
-// "declares shadowtexN as a comparison sampler in one stage and an ordinary one
-// in another" for this file, hundreds of times a frame. shadow2D() below needs
-// the comparison type anyway, so this is what the rest of the pack declares.
-uniform sampler2DShadow shadow;
+// `shadow` is an ordinary sampler, and has to stay one.
+//
+// The engine binds shadow, shadowtex0 and shadowtex1 as comparison samplers, so
+// it reports this file as "declares shadowtexN as a comparison sampler in one
+// stage and an ordinary one in another". That warning is correct and this
+// declaration is the only spelling that compiles: the variable-penumbra shadow
+// loop below reads the map as raw depth with texelFetch2D and compares it
+// against projectedShadowPosition.z itself, and texelFetch has no overload for
+// a comparison sampler. Declaring it sampler2DShadow to silence the warning
+// turns the warning into
+//     'texelFetch' : no matching overloaded function found
+// and the whole pack stops drawing.
+//
+// So the read really is an ordinary read of a comparison binding, which the
+// engine calls undefined and which is also undefined under Iris. It is left
+// alone deliberately: the alternative is rewriting the variable-penumbra
+// algorithm around shadow2D(), which returns a filtered 0..1 visibility rather
+// than a depth and would change how shadows look, not just how they compile.
+//
+// shadowtex0 and shadowtex1 are declared as comparison samplers because that is
+// what the binding is and nothing here reads them, so this costs nothing and
+// removes the part of the warning that was simply wrong.
+uniform sampler2D shadow;
 
 #ifdef TRANSLUCENT_COLORED_SHADOWS
 	uniform sampler2D shadowcolor0;
