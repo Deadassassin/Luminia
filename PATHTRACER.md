@@ -33,7 +33,22 @@ lighting pass that consumes it. Two targets:
 | `colortex10` | `rgb` accumulated radiance, `a` history length |
 | `colortex9` | `r` scene depth the estimate was made against, `g` luminance, `b` hit confidence, `a` held at 0 |
 
-Both at `PT_SCALE` of the frame, default half.
+Both at full resolution, and that is not a preference. A pass cannot bind
+targets of two different scales; the loader refuses to draw one that does, by
+name:
+
+```
+deferred3 writes targets of two sizes, 0.500 by 0.500 of the screen and
+1.000 by 1.000 of the screen for colortex1
+```
+
+That is what happened when the tracer's targets were given a `size.buffer`
+directive. The G-buffer and the depth buffer are full resolution and cannot be
+made otherwise, so a pass that reads them has to run at full resolution too.
+A half-resolution tracer would need the depth and the G-buffer downsampled into
+targets of its own first — another pass, and more targets than the chain has
+room for. `PT_SCALE` therefore has to stay `1.0`, and `tools/check_pt_scale.py`
+exists to keep it there.
 
 `colortex9`'s alpha is deliberately zero. `composite3.fsh` reads that buffer's
 alpha as a rain-drop mask; since nothing in the pack has ever written it, that
@@ -48,13 +63,16 @@ The tracer is the most expensive thing in the pack. In order of what they buy:
    reasonable default; 12 still looks right.
 2. `PT_BOUNCES` — segments per path. Roughly linear. One bounce still beats the
    old SSR; two is where the second surface starts showing up.
-3. `PT_SCALE` — the fraction of the frame it runs at. Quarter is a third of the
-   samples for the same wall-clock.
-4. `PT_MAX_FRAMES` — pure quality, almost free. Lowering it makes reflections
+3. `PT_MAX_FRAMES` — pure quality, almost free. Lowering it makes reflections
    respond faster and look noisier.
-5. `PT_ROUGHNESS_CUTOFF` — skips tracing surfaces too rough to reflect. Raising
+4. `PT_ROUGHNESS_CUTOFF` — skips tracing surfaces too rough to reflect. Raising
    it is the cheapest saving of all, at the cost of the roughest materials
    losing their sheen entirely.
+
+Note what is *not* on that list: the tracer's resolution. It is not adjustable,
+because a pass cannot mix target scales and the G-buffer is full resolution.
+That makes it the most expensive thing in the pack, and it is worth knowing
+before turning it on at 1920×1080.
 
 ## Why it is built the way it is
 

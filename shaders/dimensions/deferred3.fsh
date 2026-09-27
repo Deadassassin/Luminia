@@ -40,8 +40,6 @@ uniform float near;
 uniform float far;
 
 uniform sampler2D depthtex0;
-uniform sampler2D noisetex;
-uniform sampler2D colortex1;  // albedo, material
 uniform sampler2D colortex3;  // the previous frame's lit scene
 uniform sampler2D colortex8;  // specular: smoothness, metalness, sss, emissive
 uniform sampler2D colortex15; // geometric normal, vanilla AO
@@ -93,9 +91,9 @@ ptFetchNormal(colortex15, uv, nrm);
 // so this is the honest limit of what can be traced here. See PATHTRACER.md.
 if (dot(nrm, -normalize(viewPos)) < 0.0) nrm = -nrm;
 
-vec3 albedo, emissive;
+vec3 emissive;
 float smoothness, metalness;
-ptFetchSurface(colortex1, colortex8, uv, albedo, smoothness, metalness, emissive);
+ptFetchSurface(colortex8, uv, smoothness, metalness, emissive);
 
 // Smooth enough to show a reflection at all. Below this the lobe is wider than
 // the screen and the estimate is noise, so it is not worth a sample.
@@ -124,7 +122,7 @@ vec3 zenith = horizon * vec3(0.82, 0.92, 1.12);
 vec3 radiance;
 float confidence;
 radiance = ptTracePath(
-	colortex15, colortex1, colortex8, colortex3,
+	colortex15, colortex8, colortex3,
 	viewPos, nrm, viewDir, smoothness, metalness,
 	zenith, horizon, ptSunVec, max(ptSunColor, vec3(0.0)) / 30.0,
 	seed, PT_BOUNCES, PT_STEPS, PT_MAX_DISTANCE, PT_THICKNESS, confidence

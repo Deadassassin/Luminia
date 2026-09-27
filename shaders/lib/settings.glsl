@@ -348,10 +348,15 @@ const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.
 // Turning this off puts the original SSR back, which is the point - the two are
 // alternatives and the old one is still here.
 #define PATH_TRACER
-// The fraction of the frame the tracer runs at. Half is the default because a
-// stochastic estimate is noisy enough that the resolution loss is not what you
-// notice, and quarter is a third of the samples for the same amount of time.
-#define PT_SCALE 0.5 // [0.25 0.5 1.0]
+// The fraction of the frame the tracer runs at.
+//
+// This is 1.0 and has to stay 1.0. A pass cannot bind targets of two different
+// scales - the loader refuses to draw one that does, naming the offending target
+// - and this pass reads the G-buffer and the depth buffer, which are full
+// resolution and cannot be otherwise. Dropping the tracer to half resolution
+// would mean first downsampling the depth and the G-buffer into targets of its
+// own, which is another pass and more targets than the chain has room for.
+#define PT_SCALE 1.0
 // Depth samples per ray. The single biggest cost in the pass, and the first
 // thing to turn down.
 #define PT_STEPS 24 // [8 12 16 20 24 32 40 48 64]

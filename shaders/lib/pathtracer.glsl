@@ -32,6 +32,12 @@
 // Requires from the including program: near, far, gbufferProjection,
 // gbufferProjectionInverse, gbufferModelViewInverse, texelSize, frameCounter,
 // and the samplers passed in below.
+//
+// Note there is no albedo parameter. An earlier version read the G-buffer's
+// albedo at each hit and then multiplied it by NdotL - but the radiance it
+// multiplies is the previous frame's *lit* scene, which already has the albedo
+// multiplied in. The read was dead, and it was a full-resolution sampler in the
+// innermost loop.
 
 #ifndef FXT_LIB_PATHTRACER_INCLUDED
 #define FXT_LIB_PATHTRACER_INCLUDED
@@ -70,9 +76,8 @@ vec3 ptViewToWorld(vec3 viewDir) {
 // ---------------------------------------------------------------------------
 // Surface fetch
 // ---------------------------------------------------------------------------
-// colortex15 carries the G-buffer's geometric normal, colortex1 the albedo and
-// colortex8 the specular block: .r perceptual smoothness, .g metalness, .b
-// subsurface, .a emissive.
+// colortex15 carries the G-buffer's geometric normal and colortex8 the specular
+// block: .r perceptual smoothness, .g metalness, .b subsurface, .a emissive.
 //
 // Reading the G-buffer rather than the material atlases is deliberate. The
 // atlases read one pixel and no more unless a PBR resource pack is installed -
@@ -83,11 +88,9 @@ void ptFetchNormal(sampler2D nrmTex, vec2 uv, out vec3 n) {
 	n = normalize(texture2D(nrmTex, uv).xyz * 2.0 - 1.0);
 }
 
-void ptFetchSurface(sampler2D albTex, sampler2D specTex, vec2 uv,
-					out vec3 albedo, out float smoothness, out float metalness, out vec3 emissive) {
-	vec4 a = texture2D(albTex, uv);
+void ptFetchSurface(sampler2D specTex, vec2 uv,
+					out float smoothness, out float metalness, out vec3 emissive) {
 	vec4 s = texture2D(specTex, uv);
-	albedo = max(a.rgb, vec3(0.0));
 	smoothness = clamp(s.r, 0.0, 1.0);
 	// LabPBR puts a full metal in the top of the range and leaves dielectric F0
 	// below it. Reading the whole channel as F0 without that split is what makes
@@ -260,7 +263,7 @@ vec3 ptSkyRadiance(vec3 worldDir, vec3 zenith, vec3 horizon, vec3 sunDir, vec3 s
 // than sky. It is what lets the consumer fade a reflection out where the trace
 // is mostly guessing, instead of showing a noise field at full strength.
 vec3 ptTracePath(
-	sampler2D nrmTex, sampler2D albTex, sampler2D specTex, sampler2D litTex,
+	sampler2D nrmTex, sampler2D specTex, sampler2D litTex,
 	vec3 P, vec3 N, vec3 V, float smoothness, float metalness,
 	vec3 zenith, vec3 horizon, vec3 sunDirWorld, vec3 sunColor,
 	vec2 seed, int bounces, int steps, float maxDist, float thickness,
@@ -316,9 +319,9 @@ vec3 ptTracePath(
 		vec3 hitN;
 		ptFetchNormal(nrmTex, hitUv, hitN);
 
-		vec3 hitAlb, hitEmis;
+		vec3 hitEmis;
 		float hitSm, hitMt;
-		ptFetchSurface(albTex, specTex, hitUv, hitAlb, hitSm, hitMt, hitEmis);
+		ptFetchSurface(specTex, hitUv, hitSm, hitMt, hitEmis);
 
 		// The previous frame's lit scene is the only image of the lit world
 		// available this early in the frame.
