@@ -95,15 +95,50 @@ def expand(path, seen=None):
     return "\n".join(out)
 
 
-def compile_one(name, stage, extra_defines, tmp):
+def apply_overrides(source, overrides):
+    """Force option values the way the engine does: by replacing the pack's own
+    declaration, not by adding a second one.
+
+    Two `#define`s of the same name with different values is an error in GLSL, so
+    a harness that prepends its own gets "Macro redefined; different
+    substitutions" for every option it touches and learns nothing about the code
+    it meant to be checking. The engine has the same constraint and solves it the
+    same way: the pack declares the option, and the value comes from the pack or
+    from the player's settings, never from both.
+
+    A name the pack only mentions in a commented-out `#define` is uncommented,
+    which is how an option that ships off gets switched on.
+    """
+    for name, value in overrides.items():
+        if value is None:
+            # Force off. A name the pack only mentions in a commented-out
+            # `#define` is already off, so finding nothing here is the success
+            # case and not something to complain about.
+            source = re.sub(r"^([ \t]*)#define\s+%s\b[^\n]*$" % re.escape(name),
+                            r"\1// #define \g<0>", source, flags=re.M)
+            continue
+        # Force on, or to a value. Matches a live `#define` and a commented one
+        # alike, because an option that ships off is exactly the case worth
+        # testing and the two are written the same way.
+        new, n = re.subn(r"^([ \t]*)(?://[ \t]*)?#define\s+%s\b[^\n]*$" % re.escape(name),
+                         lambda m: "%s#define %s %s" % (m.group(1), name, value),
+                         source, flags=re.M)
+        if n == 0:
+            raise ValueError("nothing declares %s, so it cannot be forced" % name)
+        source = new
+    return source
+
+
+def compile_one(name, stage, overrides, tmp):
     src = expand(os.path.join(DIMS, name))
+    src = apply_overrides(src, overrides)
     body = "\n".join(l for l in src.split("\n") if not l.lstrip().startswith("#version"))
     body = re.sub(r"\bvarying\b", "out" if stage == "vert" else "in", body)
     for a, b in RENAMES:
         body = re.sub(r"\b%s\b" % a, b, body)
     dst = os.path.join(tmp, name.replace(".", "_") + "." + stage)
     with open(dst, "w", encoding="utf-8") as f:
-        f.write("\n".join(["#version 130", extra_defines, SUPPLIED, body]))
+        f.write("\n".join(["#version 130", SUPPLIED, body]))
     p = subprocess.run(["glslangValidator", "-S", stage, dst],
                        capture_output=True, text=True)
     os.unlink(dst)
@@ -120,16 +155,25 @@ def compile_one(name, stage, extra_defines, tmp):
 
 
 def main():
+    # indirect_effect is a second preprocessor switch over the same code, and it
+    # decides whether there is any coloured light at all, so all of its modes are
+    # worth having compiled. 3 is occlusion only; 4 adds the bounce.
+    MODES = [
+        ("PATH_TRACER off, indirect 3", {"PATH_TRACER": None, "indirect_effect": "3"}),
+        ("PATH_TRACER off, indirect 4", {"PATH_TRACER": None, "indirect_effect": "4"}),
+        ("PATH_TRACER on,  indirect 3", {"PATH_TRACER": "1", "indirect_effect": "3"}),
+        ("PATH_TRACER on,  indirect 4", {"PATH_TRACER": "1", "indirect_effect": "4"}),
+    ]
+
     failed = 0
     with tempfile.TemporaryDirectory(prefix="fauxtracer_modes_") as tmp:
-        for label, defines in (("PATH_TRACER off", ""),
-                               ("PATH_TRACER on ", "#define PATH_TRACER 1\n")):
+        for label, overrides in MODES:
             print("== %s ==" % label)
             bad = 0
             for name, stage in SCOPE:
                 try:
-                    errs = compile_one(name, stage, defines, tmp)
-                except (FileNotFoundError, RecursionError) as e:
+                    errs = compile_one(name, stage, overrides, tmp)
+                except (FileNotFoundError, RecursionError, ValueError) as e:
                     print("  FAIL %-24s %s" % (name, e))
                     bad += 1
                     continue
@@ -147,7 +191,7 @@ def main():
     if failed:
         print("%d program/configuration combination(s) failed" % failed)
         return 1
-    print("both configurations of the tracer and its consumer compile clean")
+    print("every mode of the tracer and the indirect lighting compiles clean")
     print()
     print("This does not exercise the loader's GLSL-to-SPIR-V translation. Only")
     print("the game can do that: reload the pack and read the log.")

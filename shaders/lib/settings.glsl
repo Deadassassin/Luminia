@@ -105,18 +105,37 @@
 //      ever darkens; it cannot put light on a surface.
 //   2  ground-truth AO - hemisphere-sampled rays against the depth buffer, so it
 //      gets contact shadows and the broad falloff right.
-//   3  ray-marched SSGI - cosine-weighted hemisphere rays, each marched against
-//      depth and shaded by what they hit, so shadowed surfaces pick up colour off
-//      their surroundings instead of sitting in flat ambient. This is the one
-//      that reads as real bounce light.
-//   4  as 3, plus a temporal reprojection of the hit against the previous frame,
-//      which resolves the noise properly but can ghost on fast camera motion.
+//   3  ray-marched SSRT, occlusion only. Cosine-weighted hemisphere rays are
+//      marched against the depth buffer, and a ray that hits geometry darkens
+//      the pixel. It never *adds* anything: on a hit, radiance and occlusion
+//      both take the same sky term and the subtraction at the end of ApplySSRT
+//      cancels it, so a hit contributes exactly zero light. This is why it reads
+//      as flat ambient with darker corners.
+//   4  as 3, plus a temporal reprojection of the hit against the previous
+//      frame's lit scene. That is the only mode in which the bounce term is
+//      non-zero, and it is the difference between a scene that is merely lit and
+//      one that looks lit: light off a red wall onto a pale floor, a torch
+//      throwing orange onto the ceiling above it.
 //
-// 3 rather than 4: 4 needs the previous frame's colour buffer and reprojects into
-// it, and on a fast turn the reprojection is wrong for a frame or two, which shows
-// as coloured smearing across the whole screen. 3 is noisy-free enough at this ray
-// count and never ghosts. Step up if you want it and can see the difference.
-#define indirect_effect 3 // [0 1 2 3 4]
+// Note that the original comment here claimed 3 was "the one that reads as real
+// bounce light". ApplySSRT's arithmetic does not agree, which is why this ships
+// on 3 by default and nobody could work out why their scene had no colour in it.
+//
+// 4 is the default now, which is what it should always have been. It was avoided
+// because it reprojects into the previous frame, and on a fast turn that
+// reprojection is wrong for a frame or two - coloured smearing across the whole
+// screen, which is worse than having no bounce at all. ApplySSRT now fades the
+// bounce out as the camera moves instead of accepting a reprojection it does not
+// trust, so the smearing is gone and the bounce survives everywhere the camera is
+// still, which is where a person stops to look at a scene.
+//
+// There is no other coloured indirect light in this pack. The voxel flood fill
+// (LPV) needs a 1D storage image and a compute pass the engine does not run, so
+// it is dead here regardless of what LPV_ENABLED says - see PATHTRACER.md.
+//
+// If the frame rate suffers, this and RAY_COUNT are the first two things to turn
+// down.
+#define indirect_effect 4 // [0 1 2 3 4]
 
 #define AO_in_sunlight
 #define AO_Strength 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0]

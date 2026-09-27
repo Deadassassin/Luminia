@@ -412,8 +412,44 @@ vec3 ApplySSRT(
 				previousPosition = mat3(gbufferPreviousModelView) * previousPosition + gbufferPreviousModelView[3].xyz;
 				previousPosition.xy = projMAD(gbufferPreviousProjection, previousPosition).xy / -previousPosition.z * 0.5 + 0.5;
 
-				if (previousPosition.x > 0.0 && previousPosition.y > 0.0 && previousPosition.x < 1.0 && previousPosition.x < 1.0){
-					bouncedLight = texture2D(colortex5, previousPosition.xy).rgb * GI_Strength;	
+				if (previousPosition.x > 0.0 && previousPosition.y > 0.0 && previousPosition.x < 1.0 && previousPosition.y < 1.0){
+					// The y bound was missing: the test read
+					// `previousPosition.x < 1.0` twice. A reprojected point below
+					// the screen therefore passed, and sampled off the edge of the
+					// target - which returns whatever the sampler clamps to, i.e.
+					// the top or bottom row of the frame. Light on a wall in the
+					// lower half of the screen could come from the sky at the top
+					// of it.
+					//
+					// colortex3, not colortex5.
+					//
+					// colortex5 is the TAA history, and composite5.fsh writes it
+					// with fp10Dither() because the target is R11F_G11F_B10F.
+					// Sampling it here pulls a 10-bit triangular dither straight
+					// into the indirect term, which re-injects exactly the
+					// coloured speckle the bounce exists to remove. It is also
+					// already blended against its own history, so a bounce off a
+					// moving light smears along its path.
+					//
+					// colortex3 is the lit scene the lighting pass wrote,
+					// undithered. This program already reads and writes it, so
+					// the engine serves a copy taken ahead of the pass - the
+					// previous frame, which is what a bounce wants anyway.
+					// The previous frame's position for a ray a few metres away
+					// is only good if the camera barely moved. On a fast turn it
+					// can be metres off, and the bounce then arrives from
+					// entirely the wrong part of the scene - which is the
+					// coloured smearing this option has always been known for,
+					// and the reason the pack shipped with indirect_effect 3.
+					//
+					// Fading it out on camera motion is the cheap fix. It costs
+					// the bounce exactly when the camera is moving fast enough
+					// for the bounce to be wrong, and keeps it everywhere else,
+					// which is where a person actually stops to look at a scene.
+					float camDelta = length(cameraPosition - previousCameraPosition);
+					float trust = 1.0 - smoothstep(0.05, 0.5, camDelta);
+
+					bouncedLight = texture2D(colortex3, previousPosition.xy).rgb * GI_Strength * trust;	
 
 					radiance += bouncedLight;
 					radiance2 += bouncedLight;

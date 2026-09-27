@@ -96,6 +96,73 @@ device's enabled extensions and Minecraft does not expose a ray tracing pipeline
 to shader packs. Every "ray traced" pack for Minecraft is a raster or compute
 tracer that reads a depth buffer or a voxel grid, and so is this one.
 
+## Coloured light: where it lives, and why it was missing
+
+**The pack does not lack coloured indirect light. It ships switched off, and the
+option that controls it is the least obvious one in the file.**
+
+`indirect_effect` in `lib/settings.glsl` selects the indirect lighting algorithm,
+and it is the single biggest lever on whether a scene looks photographically lit:
+
+| value | mode | puts light on a surface? |
+| --- | --- | --- |
+| 0 | off | no |
+| 1 | SSAO | no — only ever darkens |
+| 2 | GTAO | no — only ever darkens |
+| 3 | SSRT, occlusion only | no |
+| 4 | **SSRT, occlusion + bounce** | **yes** |
+
+The pack shipped on `3`. In `ApplySSRT` a ray that hits geometry adds the same
+sky term to `radiance` and to `occlusion`, and the function ends by subtracting
+one from the other — so on a hit the contribution is exactly zero. Mode 3 is
+therefore occlusion and nothing else, which is why the scene has colour in the
+sky and none in the shadows. Mode 4 is the only one where the bounce term is
+non-zero.
+
+The comment above the option claimed mode 3 "reads as real bounce light". The
+arithmetic disagrees, which is a good part of why this was so hard to find.
+
+Three things were wrong with mode 4 as it stood:
+
+- **The reprojection bounds check was a typo.** It read
+  `previousPosition.x < 1.0` twice and never tested `y`, so a reprojected point
+  below the screen passed and sampled off the edge of the target — returning
+  whatever the sampler clamps to, which is the top or bottom row of the frame.
+  Light on a wall in the lower half of the screen could come from the sky at the
+  top of it.
+- **It sampled the wrong buffer.** `colortex5` is the TAA history, and
+  `composite5.fsh` writes it with `fp10Dither()` because the target is
+  `R11F_G11F_B10F`. Reading it pulled a 10-bit triangular dither straight into the
+  indirect term — re-injecting the exact coloured speckle the bounce is meant to
+  remove — and it is already blended against its own history, so a bounce off a
+  moving light smeared along its path. It now reads `colortex3`, the lit scene
+  the lighting pass wrote, undithered.
+- **The ghosting was accepted rather than suppressed.** Mode 4 was avoided
+  because on a fast turn the reprojection is wrong for a frame or two, and the
+  pack shipped 3 to avoid it. The bounce now fades out as the camera moves
+  instead of trusting a reprojection it knows is bad, so it survives where the
+  camera is still — which is where someone stops to look at a scene.
+
+### The voxel flood fill is dead here, whatever the option says
+
+There is a second coloured-light system, the LPV voxel flood fill, and it cannot
+run on this engine:
+
+- `lib/lpv_blocks.glsl` declares `uimage1D imgBlockData`. Vitrail's bindable
+  sampler shapes are 2D, 2DArray, 2D, MS, MSArray, Cube, CubeArray and their
+  shadow variants — there is no 1D. The engine says so directly:
+  `compute world0/shadowcomp SPIR-V failed: Unsupported texture dimensions '1D'
+  for sampler imgBlockData`
+- The pass that would populate it, `setup.csh`, is skipped entirely: *compute
+  programs skipped, no stage exists for them yet: [setup]*
+- And `shaders.properties` switches both off anyway
+  (`program.world*/setup.enabled = false`, `program.world*/shadowcomp.enabled =
+  false`).
+
+So `LPV_ENABLED` on the settings screen is a switch for a system that does not
+execute. The `LPV_SIZE`, `LPV_SATURATION` and the rest of that block have no
+effect on this engine.
+
 ## Known limits
 
 - **The reflections need a PBR resource pack to be visible.** The tracer reads
