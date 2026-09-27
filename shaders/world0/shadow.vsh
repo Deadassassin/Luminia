@@ -61,14 +61,19 @@ uniform int entityId;
 		attribute vec3 at_midBlock;
 	#endif
 
-	#ifdef LPV_ENTITY_LIGHTS
-		uniform usampler1D texBlockData;
-	#endif
+	// The per-block light table. lib/voxel_write.glsl calls ptBlockLightData()
+	// for the hand-held-light case, and the table is a function now rather than a
+	// 1D storage image - 1D is not a bindable sampler shape on this engine, so the
+	// uniform usampler1D texBlockData that used to sit here could not be bound and
+	// took the whole shadow pass down with it. lib/lpv_blocks.glsl includes
+	// items/blocks/entities itself, all three of which are pure #define tables, so
+	// including it here alongside the existing blocks/entities is harmless.
 	
     uniform int currentRenderedItemId;
 	uniform int renderStage;
 
 	#include "/lib/voxel_common.glsl"
+	#include "/lib/lpv_blocks.glsl"
 	#include "/lib/voxel_write.glsl"
 #endif
 
@@ -206,7 +211,7 @@ void main() {
 		vec3 playerpos = mat3(shadowModelViewInverse) * position + shadowModelViewInverse[3].xyz;
 	#endif
 
-	#if defined IS_LPV_ENABLED && defined MC_GL_EXT_shader_image_load_store
+	#if defined IS_LPV_ENABLED
 		PopulateShadowVoxel(playerpos);
 	#endif
 

@@ -1,3 +1,49 @@
+// The render-stage numbers, as `renderStage` reports them.
+//
+// `renderStage` is the engine's `dev.vitrail.pack.model.RenderStage` ordinal, and
+// that enum is Iris's list in Iris's order - NONE, SKY, SUNSET, CUSTOM_SKY, SUN,
+// MOON, STARS, VOID, TERRAIN_SOLID, ... HAND_TRANSLUCENT - so the numbers below
+// are that enum's, read out of it rather than guessed from Iris's documentation.
+//
+// Iris hands these to packs as macros. This engine supplies `renderStage` itself
+// but not the macros, so a pack that tests them does not compile here. That is
+// not theoretical: this file is the only place in the pack that uses them, and
+// the shadow pass that includes it failed to compile with
+//
+//     'MC_RENDER_STAGE_TERRAIN_SOLID' : undeclared identifier
+//
+// the moment the call to PopulateShadowVoxel was enabled - which is the call that
+// writes imgVoxelMask, without which the flood fill sees an empty volume and
+// light passes through walls. So the constants belong here, next to their only
+// user, rather than in a header every program has to include for them.
+//
+// All of them, not just the six used below, so that the next use does not have to
+// come back here and count the enum again.
+#define MC_RENDER_STAGE_NONE 0
+#define MC_RENDER_STAGE_SKY 1
+#define MC_RENDER_STAGE_SUNSET 2
+#define MC_RENDER_STAGE_CUSTOM_SKY 3
+#define MC_RENDER_STAGE_SUN 4
+#define MC_RENDER_STAGE_MOON 5
+#define MC_RENDER_STAGE_STARS 6
+#define MC_RENDER_STAGE_VOID 7
+#define MC_RENDER_STAGE_TERRAIN_SOLID 8
+#define MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED 9
+#define MC_RENDER_STAGE_TERRAIN_CUTOUT 10
+#define MC_RENDER_STAGE_ENTITIES 11
+#define MC_RENDER_STAGE_BLOCK_ENTITIES 12
+#define MC_RENDER_STAGE_DESTROY 13
+#define MC_RENDER_STAGE_OUTLINE 14
+#define MC_RENDER_STAGE_DEBUG 15
+#define MC_RENDER_STAGE_HAND_SOLID 16
+#define MC_RENDER_STAGE_TERRAIN_TRANSLUCENT 17
+#define MC_RENDER_STAGE_TRIPWIRE 18
+#define MC_RENDER_STAGE_PARTICLES 19
+#define MC_RENDER_STAGE_CLOUDS 20
+#define MC_RENDER_STAGE_RAIN_SNOW 21
+#define MC_RENDER_STAGE_WORLD_BORDER 22
+#define MC_RENDER_STAGE_HAND_TRANSLUCENT 23
+
 ivec3 GetVoxelIndex(const in vec3 playerPos) {
 	vec3 cameraOffset = fract(cameraPosition);
 	return ivec3(floor(playerPos + cameraOffset) + VoxelSize3/2u);

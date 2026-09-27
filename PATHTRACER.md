@@ -160,42 +160,35 @@ Three things were wrong with mode 4 as it stood:
   energy a real bounce loses each time it lands reads as though every surface
   were a white card. Default is now 0.5 and the list goes down to 0.0.
 
-### The voxel flood fill, and the five reasons it did nothing
+### The voxel flood fill, and the four things wrong with it
 
 There is a second coloured-light system: the LPV voxel flood fill. It propagates
 light through a 3D volume, multiplying it by each block's tint as it travels —
-which is exactly "a lamp with blue glass over it lights the room blue". It was
-dead here, for five independent reasons, and only the first was visible in the
-log.
+which is exactly "a lamp behind blue glass lights the room blue". Four separate
+things were wrong, and only the first was visible in the log.
 
 1. **`imgBlockData` was a 1D storage image.** The bindable sampler shapes are 2D,
    2DShadow, 2DArray, 2DArrayShadow, 2DMS, 2DMSArray, Cube, CubeShadow,
    CubeArray, CubeArrayShadow, with any `i`/`u` prefix stripped. There is no 1D,
    so the compute pass that read it did not compile:
    `compute world0/shadowcomp SPIR-V failed: Unsupported texture dimensions '1D'
-   for sampler imgBlockData`. This is the only one the engine named.
+   for sampler imgBlockData`. This is the one the engine named, and it was the
+   only reason the flood fill did not run.
 
    The buffer was never needed. Every entry in it is a compile-time constant
-   chosen by block id, so `ptBlockLightData()` computes the same two packed
-   uints from the id. The 1D shape is now gone from the pack entirely, and
-   `tools/port_lpv_table.py` extracts the table mechanically rather than copying
-   it — a dropped colour constant is a torch that lights a room the wrong colour
-   with nothing to say so.
+   chosen by block id, so `ptBlockLightData()` computes the same two packed uints
+   from the id. The 1D shape is now gone from the pack entirely. The table was
+   lifted out of `setup.csh` by script rather than by hand, because
+   transcribing a thousand lines is how a colour constant gets dropped, and a
+   dropped constant is a torch that lights a room the wrong colour with nothing to
+   say so. `lib/lpv_blocks.glsl` is now the only copy and is meant to be edited in
+   place.
 
 2. **`setup.csh` cannot run.** The engine skips it: *compute programs skipped, no
    stage exists for them yet: [setup]*. So even a 2D image would have been
    written by nothing. It is now an empty stub, since the table needs no pass.
 
-3. **`shadowcomp.csh` never included `lib/settings.glsl`.** Everything in it is
-   inside `#ifdef IS_LPV_ENABLED`, and `IS_LPV_ENABLED` is a derived macro the
-   pack defines *in that file*. The engine supplies option _values_ to every
-   program, but a program that does not include the file deriving the macro
-   cannot see it — so the entire flood fill, 2232 lines, was compiled out of the
-   one program that performs it. This is the reason the engine reported
-   `texLpv1` and `texLpv2` among the samplers the chain reads while nothing was
-   ever putting light into them.
-
-4. **The fragment stage gated the volume read behind a macro the engine does not
+3. **The fragment stage gated the volume read behind a macro the engine does not
    define.** `doBlockLightLighting` read
    `#if defined IS_LPV_ENABLED && defined MC_GL_EXT_shader_image_load_store`, and
    the engine's macro set is `MC_GL_VERSION`, `MC_GL_VENDOR_*` and
@@ -206,20 +199,62 @@ log.
    which means exactly "can I read a custom image", and which this engine does
    provide.
 
-5. **`LPV_ENABLED` ships commented out.** The settings screen offers it, and the
-   flood fill and its volumes are gated on it, but the pack's own default is off.
-   Your saved settings already have it on, which is why the volumes were allocated
-   and bound at all.
+4. **The shadow vertex stage gated the volume's *fill* behind the same dead
+   macro** — `world0/shadow.vsh`, and the Nether's and the End's:
+
+   ```glsl
+   #if defined IS_LPV_ENABLED && defined MC_GL_EXT_shader_image_load_store
+       PopulateShadowVoxel(playerpos);
+   #endif
+   ```
+
+   This is the one that made light come through walls. With the call compiled out,
+   nothing ever wrote `imgVoxelMask`. The engine clears that volume every frame
+   and `GetVoxelBlock` reads it, so every voxel in the 256³ grid read as `0` —
+   which is `BLOCK_EMPTY`, air. The flood fill therefore believed the whole volume
+   was empty and propagated light straight through the world.
+
+   The three shadow stages also each declared `uniform usampler1D texBlockData;`
+   under `LPV_ENTITY_LIGHTS`, which ships on. A 1D sampler cannot be bound, so
+   opening this gate would have failed the shadow pass outright with the same
+   `'1D'` error as `shadowcomp`. Those declarations are gone;
+   `lib/voxel_write.glsl` calls `ptBlockLightData()` instead, and
+   `lib/voxel_write.glsl` now defines the `MC_RENDER_STAGE_*` numbers it tests —
+   the engine supplies `renderStage` as its `RenderStage` ordinal but not Iris's
+   macros for them.
 
 `shadowcomp` was never disabled — `shaders.properties` only disables it in the
-`#else` of `#ifdef LPV_ENABLED`, so with the option on it was being dispatched
-every frame and failing to compile. Fixing the compile was the whole of it.
+`#else` of `#ifdef LPV_ENABLED`, so with the option on it was dispatched every
+frame and failing to compile.
 
-**Still unverified.** None of this has been run in game. The flood fill is 2232
-lines that have never executed on this engine.
+`LPV_ENABLED` ships commented out; your saved settings have it on, which is why
+the volumes were allocated and bound at all.
+
+#### A correction
+
+An earlier version of this document claimed a fifth reason: that
+`dimensions/shadowcomp.csh` did not include `lib/settings.glsl`, and that the
+whole flood fill was therefore `#ifdef`'d out. **That was wrong.** Each world
+wrapper — `world0/shadowcomp.csh`, `world1`, `world-1` — already includes
+`settings.glsl` before including the body, so `IS_LPV_ENABLED` was always in
+scope. Adding the include to the body only included the file twice, and since it
+declares `const float ambientOcclusionLevel = 1.0;` the second copy is a
+redefinition that stopped the pass compiling. The include has been removed again,
+and `dimensions/shadowcomp.csh` carries a note saying why it must not come back.
+
+The flood fill was live in the source all along. The 1D image alone stopped it
+running, and item 4 above is what made what it produced wrong.
+
 
 ## Known limits
 
+- **`POM` cannot compile on this engine.** `all_solid.fsh` and `all_solid.vsh` both
+  do `#ifdef POM` / `#define MC_NORMAL_MAP`, and the engine already defines
+  `MC_NORMAL_MAP` to a value, so the pack's empty definition is a redefinition
+  with different substitutions and the geometry programs stop compiling. It is
+  off by default and off in your settings, so it has not bitten — but turning
+  `POM` on will break the pack here. This is pre-existing and has nothing to do
+  with the tracer or the flood fill.
 - **The reflections need a PBR resource pack to be visible.** The tracer reads
   smoothness and metalness out of `colortex8`, which the geometry programs fill
   from the resource pack's `specular` atlas. With no PBR pack installed that

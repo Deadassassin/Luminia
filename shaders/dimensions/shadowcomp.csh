@@ -1,18 +1,27 @@
 #define RENDER_SHADOWCOMP
 
-// The option file, and specifically for IS_LPV_ENABLED.
+// No `#include "/lib/settings.glsl"` here, and that is deliberate.
 //
-// This pass did not include it, and everything below sits inside
-// `#ifdef IS_LPV_ENABLED` - so the entire light propagation volume was compiled
-// out of the one program that performs it. The fragment programs do include
-// settings.glsl and have had the volume live all along, which is why the engine
-// reports texLpv1 and texLpv2 among the samplers the chain reads: the volumes
-// were being sampled, and nothing was ever putting light into them.
+// One was added to this file on the reasoning that the light propagation volume
+// was compiled out of this pass because it did not see IS_LPV_ENABLED, and that
+// reasoning was wrong. Each world wrapper - world0/shadowcomp.csh, world1, world-1
+// - already includes settings.glsl *before* including this file, so the macro was
+// always in scope and the flood fill was always compiled. Adding the include here
+// only included settings.glsl twice, and it declares
 //
-// The engine supplies option *values* to every program, but IS_LPV_ENABLED is a
-// derived macro the pack defines itself, and a program that does not include the
-// file that derives it cannot see it.
-#include "/lib/settings.glsl"
+//     const float ambientOcclusionLevel = 1.0;
+//
+// so the second copy is a redefinition and the pass stops compiling before it
+// reaches any of the code below.
+//
+// What actually stopped this pass running was the one thing the log named: the 1D
+// storage image, `imgBlockData`, which this engine cannot bind. The pass was
+// dispatched every frame and its SPIR-V failed, which is why the engine reported
+// the volumes as bound and sampled - texLpv1 and texLpv2 among the samplers the
+// chain reads - while nothing was ever putting light into them.
+//
+// The leak that followed is a third, separate thing, and lives in the shadow
+// vertex stage rather than here. See world*/shadow.vsh.
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
 
