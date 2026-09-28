@@ -106,6 +106,7 @@ uniform vec3 nsunColor;
 #include "/lib/projections.glsl"
 #include "/lib/sky_gradient.glsl"
 #include "/lib/waterBump.glsl"
+#include "/lib/water_interaction.glsl"
 
 
 #ifdef OVERWORLD_SHADER
@@ -553,12 +554,34 @@ if (gl_FragCoord.x * texelSize.x < 1.0  && gl_FragCoord.y * texelSize.y < 1.0 )	
 			
 			// make the waves flow in the direction the water faces, except for perfectly up facing parts.
 			if(abs(worldSpaceNormal.y) < 0.9995) posxz.xz -= (posxz.y + frameTimeCounter*3 * WATER_WAVE_SPEED) * normalize(worldSpaceNormal.xz) ;
-		
+
+			// The water surface's own height, kept before the parallax
+			// displacement below moves the sample point. The interaction ripples
+			// need it to know how far the surface is below the eye - that is the
+			// gate that stops a player on a bridge setting the lake below moving -
+			// and a displaced sample point would put that gate in slightly the
+			// wrong place, by up to the depth of the displacement.
+			float waterSurfaceY = posxz.y;
+
 			posxz.xyz = getParallaxDisplacement(posxz);
 			vec3 bump = normalize(getWaveNormal(posxz, false));
 
 			float bumpmult = 10.0 * WATER_WAVE_STRENGTH;
 			bump = bump * vec3(bumpmult, bumpmult, bumpmult) + vec3(0.0f, 0.0f, 1.0f - bumpmult);
+
+			// Ripples where the player is in the water, added after the ambient
+			// swell has been scaled rather than before, so WATER_RIPPLE_STRENGTH
+			// means the same thing whatever WATER_WAVE_STRENGTH is set to. The
+			// 10.0 mirrors the bumpmult above, putting both in the same visual
+			// range: this is a wake on water that is already moving, not a
+			// replacement for it.
+			//
+			// lib/water_interaction.glsl returns slope in getWaveNormal()'s own
+			// basis - x is d/dx, y is d/dz, in world XZ - so it adds straight into
+			// bump.xy.
+			#ifdef WATER_INTERACTION
+				bump.xy += waterInteractionSlope(posxz.xz, waterSurfaceY) * (10.0 * WATER_RIPPLE_STRENGTH);
+			#endif
 
 			NormalTex.xyz = bump;
 

@@ -394,6 +394,9 @@ screen.World = World
         option.Dirt_Amount = Dirt Amount
         option.Water_Top_Layer = Ocean Y coordinate
         option.WATER_WAVE_STRENGTH = Wave Strength
+        option.WATER_INTERACTION = Water Interaction
+        option.WATER_RIPPLE_STRENGTH = Ripple Strength
+        option.WATER_RIPPLE_SCALE = Ripple Scale
         option.SNELLS_WINDOW = Snell's Window
         
         screen.Water_fog_color = Water Fog Settings
@@ -707,6 +710,9 @@ option.SKY_GROUND = Atmosphere ground
 
 option.MATERIAL_AO.comment = Toggle the use of ambient occlusion based on what the resourcepack provides. §aPERFORMANCE COST:§r very low
 option.WATER_WAVE_STRENGTH.comment = configure how strong the waves appear.
+option.WATER_INTERACTION.comment = §bWhat is this?§r Ripples on the water where you are in it - wading, swimming, walking through shallows. The wake trails behind you and fades; crossing a bridge over a lake does not disturb it. §aPERFORMANCE COST:§r low, and nothing at all when off
+option.WATER_RIPPLE_STRENGTH.comment = How hard the water is pushed by the interaction. Separate from Wave Strength, which is the ambient swell - strong waves and a subtle wake are different things.
+option.WATER_RIPPLE_SCALE.comment = The size of the ripples. Below 1 they are broad and slow, above 1 tight and quick.
 option.MOONPHASE_BASED_MOONLIGHT.comment = §bWhat is this?§r every night, the moon has different lighting. This setting adjusts the moonlight brightness based on how much of the moon is glowing. §aPERFORMANCE COST:§r nearly nothing
 
 option.END_STORM_DENSTIY.comment =  §bWhat is this?§r This is the dark cloudy fog in the end. Confingure the density of the end storm.
