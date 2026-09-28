@@ -1,4 +1,4 @@
-# FauxTracer's path tracer
+# Penumbra's path tracer
 
 A stochastic screen-space path tracer, added to this pack and running on
 Vitrail's Vulkan backend. It replaces the pack's single-bounce screen-space

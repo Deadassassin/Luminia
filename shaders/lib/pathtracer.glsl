@@ -1,4 +1,4 @@
-// FauxTracer - screen-space path tracing
+// Penumbra - screen-space path tracing
 // ---------------------------------------------------------------------------
 // A stochastic path tracer that runs in one fullscreen pass and is consumed by
 // the deferred lighting pass. Three things make it a path tracer rather than the

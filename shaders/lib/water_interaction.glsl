@@ -1,4 +1,4 @@
-// FauxTracer - water interaction ripples
+// Penumbra - water interaction ripples
 // ---------------------------------------------------------------------------
 // Ripples on the water surface where the player disturbs it: walking through
 // shallows, wading, swimming.

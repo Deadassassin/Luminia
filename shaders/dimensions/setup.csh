@@ -1,4 +1,4 @@
-// FauxTracer - the LPV setup pass is now a no-op
+// Penumbra - the LPV setup pass is now a no-op
 // ---------------------------------------------------------------------------
 // This used to build a 1D storage image of per-block light colour, range and
 // tint, by running a comparison chain per block id. It had two problems on this

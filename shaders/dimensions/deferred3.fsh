@@ -3,7 +3,7 @@
 #include "/lib/util.glsl"
 
 // ---------------------------------------------------------------------------
-// FauxTracer - screen-space path trace
+// Penumbra - screen-space path trace
 // ---------------------------------------------------------------------------
 // One pass, two targets.
 //

@@ -1,4 +1,4 @@
-// FauxTracer - per-block light and tint data
+// Penumbra - per-block light and tint data
 // ---------------------------------------------------------------------------
 // Provenance: the table below was lifted verbatim out of dimensions/setup.csh,
 // lines 10-50 (the colour constants and the two matrix builders) and lines 59-1154
