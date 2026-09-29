@@ -593,6 +593,94 @@ def check_reachable_options(problems):
               % ("option screens", len(on)))
 
 
+def check_geometry_chain(problems):
+    """A geometry stage's varyings must match the stages either side of it.
+
+    This is the check that would have caught the distant-artifact bug. The
+    geometry stage sits between the vertex and fragment stages, and its inputs
+    and outputs are a link-time contract - but a mismatch is not a compile
+    error. A geometry stage that declares a varying the vertex stage does not
+    write still compiles, the pipeline still builds, and the fragment stage
+    reads whatever was left in that location. What that looks like is not a
+    failure: it is a scene that renders, with wrong light and wrong normals,
+    worst at distance where every value is interpolated from far away.
+
+    Compiling the stages separately cannot find this, which is the point. Two
+    programs that each compile say nothing about whether they agree.
+
+    The one subtlety is the spelling. The vertex and fragment stages declare
+    loose `varying`s, which the loader hoists into individual in/out
+    declarations; a geometry stage's inputs are the same names as arrays. An
+    interface block is a different thing and does not match a set of loose
+    declarations, so the shapes have to be compared per-name rather than as
+    blocks.
+    """
+    for stem in ("gbuffers_terrain",):
+        vert = os.path.join(PACK, "world0", stem + ".vsh")
+        geom = os.path.join(PACK, "world0", stem + ".gsh")
+        frag = os.path.join(PACK, "world0", stem + ".fsh")
+        if not all(os.path.isfile(p) for p in (vert, geom, frag)):
+            continue
+        try:
+            vs = loose_varyings(expand(vert))
+            fs = loose_varyings(expand(frag))
+            gs = expand(geom)
+        except (FileNotFoundError, RecursionError) as e:
+            problems.append("%s.gsh  %s" % (stem, e))
+            continue
+
+        gin = {}
+        for m in re.finditer(r"^\s*(?:flat\s+)?in\s+(\w+)\s+(?:in_)?(\w+)\[\];",
+                             gs, re.M):
+            gin[m.group(2)] = m.group(1)
+        gout = {}
+        for m in re.finditer(r"^\s*(?:flat\s+)?out\s+(\w+)\s+(\w+)\s*;", gs, re.M):
+            gout[m.group(2)] = m.group(1)
+
+        # An interface block is only a match if BOTH sides use one.
+        block_in = re.search(r"^\s*in\s+\w+\s*\{", gs, re.M) is not None
+        if block_in:
+            problems.append(
+                "%s.gsh  declares its inputs as an interface block, but the "
+                "vertex stage declares loose varyings - a block does not match "
+                "a set of loose declarations, so the geometry stage is fed "
+                "nothing and the fragment stage reads whatever is in those "
+                "locations" % stem)
+            continue
+
+        for name in sorted(set(gin) - set(vs)):
+            problems.append("%s.gsh  reads %s, which %s.vsh never writes"
+                            % (stem, name, stem))
+        for name in sorted(set(gout) - set(fs)):
+            problems.append("%s.gsh  writes %s, which %s.fsh never declares"
+                            % (stem, name, stem))
+        for name in sorted(set(fs) - set(gout)):
+            problems.append("%s.fsh  declares %s, which %s.gsh never writes - "
+                            "so the fragment stage reads an undefined value"
+                            % (stem, name, stem))
+        for name in sorted(set(gin) & set(vs)):
+            if gin[name] != vs[name]:
+                problems.append("%s.gsh  %s is %s, the vertex stage's is %s"
+                                % (stem, name, gin[name], vs[name]))
+        for name in sorted(set(gout) & set(fs)):
+            if gout[name] != fs[name]:
+                problems.append("%s.gsh  %s is %s, the fragment stage's is %s"
+                                % (stem, name, gout[name], fs[name]))
+
+        if not [p for p in problems if p.startswith(stem)]:
+            print("ok    %-40s %d varyings agree across vsh/gsh/fsh"
+                  % (stem + ".*", len(gin)))
+
+
+def loose_varyings(source):
+    """{name: type} for the loose `varying` declarations in a source."""
+    out = {}
+    for m in re.finditer(r"^\s*(?:flat\s+)?varying\s+(\w+)\s+(\w+)\s*;",
+                         source, re.M):
+        out[m.group(2)] = m.group(1)
+    return out
+
+
 def programs():
     """The stub files the loader loads, i.e. the ones with a real stage."""
     for world in ("world0", "world1", "world-1", "worldx"):
@@ -779,6 +867,7 @@ def main():
 
     problems = []
     check_render_stage_enum(problems)
+    check_geometry_chain(problems)
     check_option_use(problems)
     check_reachable_options(problems)
     if problems:

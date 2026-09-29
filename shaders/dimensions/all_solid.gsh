@@ -30,6 +30,10 @@ layout(triangles) in;
 // ask for. The constant has to cover the worst case at compile time, so it is
 // the maximum rather than whatever the current setting is - and a stage that
 // emitted more vertices than it declared is undefined, not merely wrong.
+//
+// Each blade is its own primitive, so the budget is per-primitive, not for the
+// whole draw. The number that matters is the largest single blade, which is one
+// strip of 2 * (GRASS_MAX_SEGMENTS + 1) vertices.
 #if GRASS_DENSITY == 3
 	#define GRASS_MAX_SEGMENTS 6
 #elif GRASS_DENSITY == 2
@@ -48,51 +52,72 @@ layout(triangle_strip, max_vertices = 2 * (GRASS_MAX_SEGMENTS + 1)) out;
 // vertex stage does too.
 #include "/lib/blocks.glsl"
 
-in VARYINGS {
-	vec4 color;
-	float VanillaAO;
-	vec4 lmtexcoord;
-	vec4 normalMat;
-	vec4 vtexcoordam;
-	vec4 vtexcoord;
+// The varyings, declared one by one and not as an interface block.
+//
+// This is the whole reason the distant artifacting happened, and it is worth
+// writing down. The vertex stage declares its outputs as loose `varying`
+// declarations, which the loader hoists into individual `out` declarations. An
+// interface block is a different kind of thing: a block that carries an array
+// name is matched to the other stage as a whole, member by member, and it does
+// not match a set of individually-declared outputs. So the block declared here
+// was fed nothing, and what reached the fragment stage was whatever the loader
+// left in those locations.
+//
+// The symptom was in the distance rather than everywhere, and that is what made
+// it hard to place: a wrong lightmap or normal is least visible on a surface
+// close to the camera, where the same value would be reached by interpolation
+// anyway, and most visible on a distant hillside where every pixel is being
+// interpolated from far away.
+//
+// The one rule: a geometry stage's inputs are arrays, one per varying, and its
+// outputs are the same loose declarations the fragment stage already expects.
+// The arrays are the only difference from the vertex stage's own declarations.
+//
+// The inputs are prefixed `in_` because a name cannot be both an array and a
+// scalar in one scope. Writing `color = color[0]` reads as a self-assignment and
+// compiles to nothing useful, so the two are kept apart by name rather than
+// left to be told apart.
+in vec4 in_color[];
+in float in_VanillaAO[];
+in vec4 in_lmtexcoord[];
+in vec4 in_normalMat[];
+in vec4 in_vtexcoordam[];
+in vec4 in_vtexcoord[];
 
-	#ifdef MC_NORMAL_MAP
-		vec4 tangent;
-		vec3 FlatNormals;
-	#endif
+#ifdef MC_NORMAL_MAP
+	in vec4 in_tangent[];
+	in vec3 in_FlatNormals[];
+#endif
 
-	flat float blockID;
-	flat float HELD_ITEM_BRIGHTNESS;
-	flat int NameTags;
-	flat float SSSAMOUNT;
-	flat float EMISSIVE;
-	flat int LIGHTNING;
-	flat int PORTAL;
-	flat int SIGN;
-} vs_in[];
+flat in float in_blockID[];
+flat in float in_HELD_ITEM_BRIGHTNESS[];
+flat in int in_NameTags[];
+flat in float in_SSSAMOUNT[];
+flat in float in_EMISSIVE[];
+flat in int in_LIGHTNING[];
+flat in int in_PORTAL[];
+flat in int in_SIGN[];
 
-out VARYINGS {
-	vec4 color;
-	float VanillaAO;
-	vec4 lmtexcoord;
-	vec4 normalMat;
-	vec4 vtexcoordam;
-	vec4 vtexcoord;
+out vec4 color;
+out float VanillaAO;
+out vec4 lmtexcoord;
+out vec4 normalMat;
+out vec4 vtexcoordam;
+out vec4 vtexcoord;
 
-	#ifdef MC_NORMAL_MAP
-		vec4 tangent;
-		vec3 FlatNormals;
-	#endif
+#ifdef MC_NORMAL_MAP
+	out vec4 tangent;
+	out vec3 FlatNormals;
+#endif
 
-	flat float blockID;
-	flat float HELD_ITEM_BRIGHTNESS;
-	flat int NameTags;
-	flat float SSSAMOUNT;
-	flat float EMISSIVE;
-	flat int LIGHTNING;
-	flat int PORTAL;
-	flat int SIGN;
-} fs_out;
+flat out float blockID;
+flat out float HELD_ITEM_BRIGHTNESS;
+flat out int NameTags;
+flat out float SSSAMOUNT;
+flat out float EMISSIVE;
+flat out int LIGHTNING;
+flat out int PORTAL;
+flat out int SIGN;
 
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
@@ -154,36 +179,36 @@ void emitVertex(vec3 viewPos, vec3 normal, float heightFrac, int source) {
 	// blade emerges from the grass rather than sitting on top of it.
 	float fade = smoothstep(-0.35, 1.0, heightFrac);
 
-	fs_out.color = vs_in[source].color * fade;
-	fs_out.VanillaAO = vs_in[source].VanillaAO;
-	fs_out.lmtexcoord = vs_in[source].lmtexcoord;
+	color = in_color[source] * fade;
+	VanillaAO = in_VanillaAO[source];
+	lmtexcoord = in_lmtexcoord[source];
 
 	// The blade has no texture coordinates of its own - it is not a surface
 	// that was ever unwrapped - so the parallax coordinates are zeroed rather
 	// than inherited. Passing the quad's through would make a blade sample
 	// whatever part of the grass texture the quad's corner happened to name.
-	fs_out.vtexcoordam = vec4(0.0);
-	fs_out.vtexcoord = vec4(0.0);
+	vtexcoordam = vec4(0.0);
+	vtexcoord = vec4(0.0);
 
 	#ifdef MC_NORMAL_MAP
-		fs_out.tangent = vec4(0.0, 0.0, 1.0, 0.0);
+		tangent = vec4(0.0, 0.0, 1.0, 0.0);
 		// The blade's own normal. The fragment stage's parallax path reads the
 		// surface normal out of vtexcoordam, so it goes there rather than in
 		// FlatNormals, which is the normal of the ground the blade grows from -
 		// and lighting a vertical blade as though it were flat ground is what
 		// makes grass look like a painted texture.
-		fs_out.FlatNormals = normal;
-		fs_out.vtexcoordam = vec4(normal, 0.0);
+		FlatNormals = normal;
+		vtexcoordam = vec4(normal, 0.0);
 	#endif
 
-	fs_out.blockID = vs_in[0].blockID;
-	fs_out.HELD_ITEM_BRIGHTNESS = vs_in[0].HELD_ITEM_BRIGHTNESS;
-	fs_out.NameTags = vs_in[0].NameTags;
-	fs_out.SSSAMOUNT = vs_in[0].SSSAMOUNT;
-	fs_out.EMISSIVE = vs_in[0].EMISSIVE;
-	fs_out.LIGHTNING = vs_in[0].LIGHTNING;
-	fs_out.PORTAL = vs_in[0].PORTAL;
-	fs_out.SIGN = vs_in[0].SIGN;
+	blockID = in_blockID[0];
+	HELD_ITEM_BRIGHTNESS = in_HELD_ITEM_BRIGHTNESS[0];
+	NameTags = in_NameTags[0];
+	SSSAMOUNT = in_SSSAMOUNT[0];
+	EMISSIVE = in_EMISSIVE[0];
+	LIGHTNING = in_LIGHTNING[0];
+	PORTAL = in_PORTAL[0];
+	SIGN = in_SIGN[0];
 
 	EmitVertex();
 }
@@ -192,15 +217,61 @@ void main() {
 	#if defined SHADER_GRASS && defined WORLD && !defined ENTITIES && \
 	    !defined HAND && !defined BLOCKENTITIES
 
-		vec3 worldNormal = viewToWorld(vs_in[0].normalMat.xyz);
+		vec3 worldNormal = viewToWorld(in_normalMat[0].xyz);
 		float viewDist = gl_in[0].gl_Position.w;
 
-		// blockID 85 is short grass: the cross-shaped quad the game draws for it.
-		// The world normal has to point up, which is what separates it from every
-		// other quad that happens to be made of the same block.
-		bool isGrass = vs_in[0].blockID == BLOCK_GRASS_SHORT &&
-		               worldNormal.y > 0.9 &&
-		               viewDist < GRASS_RANGE;
+		// Which blocks get blades, and which of their faces.
+		//
+		// The two ids are the opposite of what they look like, and
+		// shaders/block.properties is what settles it:
+		//
+		//   block.12 = minecraft:short_grass minecraft:grass
+		//   block.85 = minecraft:grass_block:snowy=false
+		//
+		// so BLOCK_GRASS_SHORT (12) is the cross-shaped billboard and BLOCK_GRASS
+		// (85) is the full grass block. Reading them the other way round grows
+		// blades out of the side of every grass block and leaves the little tufts
+		// of short grass as flat billboards - which is the exact opposite of what
+		// the option is for.
+		//
+		// Both are replaced, but the two are handled differently:
+		//
+		//   - The grass BLOCK's top face is a full 1x1 quad, and it is replaced
+		//     outright. Its sides and bottom are left alone: a blade is drawn from
+		//     a triangle standing on the ground, and the side of a grass block
+		//     is not that.
+		//   - SHORT grass is a small cross, and it is replaced outright too. There
+		//     is nothing else to keep - it is a cross of two quads, and both go.
+		//
+		// REPLACE_SHORT_GRASS is what chooses between that and the conservative
+		// version, which keeps the billboards and puts the blades behind them.
+		bool isGrassBlock = in_blockID[0] == BLOCK_GRASS && worldNormal.y > 0.9;
+		bool isShortGrass = in_blockID[0] == BLOCK_GRASS_SHORT && worldNormal.y > 0.9;
+
+		// A short-grass cross is two intersecting quads, so one of them always
+		// faces away from the camera. Growing blades from both doubles the density
+		// at some angles and leaves a gap at others, and - worse - the two sets
+		// interpenetrate, because the same tuft is built twice from two quads that
+		// cross at the middle.
+		//
+		// So one of the pair is dropped, chosen by which way the triangle faces.
+		// gl_FrontFacing would be the obvious test and is not available: it is a
+		// fragment-stage input, and this is a geometry stage. The geometric facing
+		// is computed instead, from the triangle's own normal and the view ray.
+		if (isShortGrass) {
+			vec3 triNormal = normalize(cross(
+				gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz,
+				gl_in[2].gl_Position.xyz - gl_in[0].gl_Position.xyz));
+			// View space has the camera at the origin looking down -z, so the
+			// vector from the camera to the triangle is its own centroid, and the
+			// dot is positive when the triangle faces the camera.
+			vec3 centreDir = (gl_in[0].gl_Position.xyz +
+			                  gl_in[1].gl_Position.xyz +
+			                  gl_in[2].gl_Position.xyz) / 3.0;
+			if (dot(triNormal, centreDir) < 0.0) isShortGrass = false;
+		}
+
+		bool isGrass = (isGrassBlock || isShortGrass) && viewDist < GRASS_RANGE;
 
 		if (isGrass) {
 			// The triangle's centre, in view space. The blades stand on it.
@@ -225,21 +296,37 @@ void main() {
 			// How many blades this triangle becomes, and how many segments each
 			// has. Fewer of both further out, where a blade is a couple of pixels
 			// and cannot show a curve - the segments are the entire cost.
+			//
+			// The grass block's top face is a whole block across and the short grass
+			// cross is a fraction of one, so the same count on both leaves a field
+			// of stubble next to a wall of blades. The block's face is scaled up to
+			// match, and the multiplier is what makes the two read as the same
+			// material at the same distance.
 			int blades, segments;
 			if (viewDist > 16.0) {
-				blades = 1; segments = 1;
+				blades = isGrassBlock ? 4 : 1;
+				segments = 1;
 			} else if (viewDist > 8.0) {
-				blades = 2; segments = 2;
+				blades = isGrassBlock ? 8 : 2;
+				segments = 2;
 			} else if (viewDist > 4.0) {
-				blades = 3; segments = 3;
+				blades = isGrassBlock ? 12 : 3;
+				segments = 3;
 			} else {
-				blades = 4; segments = GRASS_MAX_SEGMENTS;
+				blades = isGrassBlock ? 16 : 4;
+				segments = GRASS_MAX_SEGMENTS;
 			}
 
-			// Where the blades stand across the quad. Spread over the triangle's
-			// own extent rather than at random inside it, so they stay on the grass
-			// and do not overhang the block edge.
-			vec3 edge = gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz;
+			// The two edges of the triangle, so blades can be spread across its whole
+			// area rather than along a line.
+			//
+			// Spreading matters more than it looks: a grass block's top face is two
+			// triangles, and putting all sixteen blades along one edge of each puts
+			// every blade in a line down the middle of the block and leaves the
+			// corners bare. Barycentric placement over the triangle is what turns
+			// the count into coverage.
+			vec3 edgeA = gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz;
+			vec3 edgeB = gl_in[2].gl_Position.xyz - gl_in[0].gl_Position.xyz;
 
 			// Blade length. Two independent randoms, so a field has blades that
 			// lean left and blades that lean right rather than one direction for
@@ -258,12 +345,35 @@ void main() {
 
 			float thickness = GRASS_BASE_THICKNESS * 0.125;
 
+			// Blade placement. A golden-ratio walk over the triangle's barycentric
+			// coordinates, rather than a grid: a grid puts the blades in visible
+			// rows, and a purely random placement clumps and leaves gaps. The
+			// sequence is the same one used elsewhere in the pack for the same job.
+			//
+			// The offsets are nudged inwards so a blade at the edge of a block face
+			// sits on the block rather than half off it.
 			for (int b = 0; b < blades; b++) {
-				// Spread the blades along the triangle's edge. A blade placed at a
-				// fixed fraction per index, rather than randomly, keeps them from
-				// clustering into bare patches and bare clumps.
-				float along = (float(b) + 0.5) / float(blades);
-				vec3 base = centre + edge * (along - 0.5) * 0.8;
+				// Two independent strides over the triangle, decorrelated by the
+				// golden ratio. A single stride walks the blades along a line; a
+				// grid puts them in visible rows. This is the standard low-discrepancy
+				// answer and it needs no state.
+				float t = (float(b) + 0.5) / float(blades);
+				float u = fract(t);
+				float v = fract(t * 0.6180339887 + 0.5);
+
+				// Pull away from the triangle's edges, so no blade stands on a seam
+				// between the two triangles of a quad or on the block boundary.
+				u = 0.15 + u * 0.7;
+				v = 0.15 + v * 0.7;
+				// The third barycentric coordinate. Renormalised afterwards so the
+				// blade still lands inside the triangle once the inset has pushed
+				// u + v past one - without that, a blade on the far side of the
+				// inset lands outside the triangle and floats off the block.
+				float w = max(1.0 - u - v, 0.0);
+				float sum = max(u + v + w, 1e-4);
+				u /= sum; v /= sum;
+
+				vec3 base = gl_in[0].gl_Position.xyz + edgeA * u + edgeB * v;
 
 				// Each blade leans its own way.
 				float jitter = fract(len * 7.0 + float(b) * 0.618);
@@ -346,26 +456,26 @@ void main() {
 	for (int i = 0; i < 3; i++) {
 		gl_Position = gl_in[i].gl_Position;
 
-		fs_out.color = vs_in[i].color;
-		fs_out.VanillaAO = vs_in[i].VanillaAO;
-		fs_out.lmtexcoord = vs_in[i].lmtexcoord;
-		fs_out.normalMat = vs_in[i].normalMat;
-		fs_out.vtexcoordam = vs_in[i].vtexcoordam;
-		fs_out.vtexcoord = vs_in[i].vtexcoord;
+		color = in_color[i];
+		VanillaAO = in_VanillaAO[i];
+		lmtexcoord = in_lmtexcoord[i];
+		normalMat = in_normalMat[i];
+		vtexcoordam = in_vtexcoordam[i];
+		vtexcoord = in_vtexcoord[i];
 
 		#ifdef MC_NORMAL_MAP
-			fs_out.tangent = vs_in[i].tangent;
-			fs_out.FlatNormals = vs_in[i].FlatNormals;
+			tangent = in_tangent[i];
+			FlatNormals = in_FlatNormals[i];
 		#endif
 
-		fs_out.blockID = vs_in[0].blockID;
-		fs_out.HELD_ITEM_BRIGHTNESS = vs_in[0].HELD_ITEM_BRIGHTNESS;
-		fs_out.NameTags = vs_in[0].NameTags;
-		fs_out.SSSAMOUNT = vs_in[0].SSSAMOUNT;
-		fs_out.EMISSIVE = vs_in[0].EMISSIVE;
-		fs_out.LIGHTNING = vs_in[0].LIGHTNING;
-		fs_out.PORTAL = vs_in[0].PORTAL;
-		fs_out.SIGN = vs_in[0].SIGN;
+		blockID = in_blockID[0];
+		HELD_ITEM_BRIGHTNESS = in_HELD_ITEM_BRIGHTNESS[0];
+		NameTags = in_NameTags[0];
+		SSSAMOUNT = in_SSSAMOUNT[0];
+		EMISSIVE = in_EMISSIVE[0];
+		LIGHTNING = in_LIGHTNING[0];
+		PORTAL = in_PORTAL[0];
+		SIGN = in_SIGN[0];
 
 		EmitVertex();
 	}
