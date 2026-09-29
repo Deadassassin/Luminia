@@ -681,6 +681,103 @@ def loose_varyings(source):
     return out
 
 
+def check_geometry_vertex_budget(problems):
+    """A geometry stage must never emit more vertices than it declares.
+
+    `max_vertices` is a hard cap and exceeding it is undefined behaviour, not a
+    compile error: the overflow is dropped. The symptom is not "too much
+    geometry" - it is whatever the stage happened to emit after it ran out,
+    which is the original triangle. A grass block's top face was being
+    discarded, so the block had no top, and the corrupted depth left mobs
+    failing the depth test.
+
+    The bound is worth computing because the two numbers live in different
+    places - the cap in the layout declaration, the emission in a loop - and
+    because the spec's wording ("a single output primitive") permits either a
+    per-primitive or a per-invocation reading, so the safe budget is the larger
+    of the two. A stage that emits one primitive per blade has to be sized for
+    every blade, not for the largest one.
+    """
+    for dirpath, _d, filenames in os.walk(PACK):
+        for name in sorted(filenames):
+            if not name.endswith(".gsh"):
+                continue
+            path = os.path.join(dirpath, name)
+            with open(path, "r", encoding="utf-8") as f:
+                text = f.read()
+            rel = os.path.relpath(path, PACK)
+            # The world*/ stubs are one-line includes of the real stage, so the
+            # declaration is in the file they include rather than in the stub.
+            try:
+                text = expand(path)
+            except (FileNotFoundError, RecursionError):
+                pass
+
+            # The cap is an expression that can itself contain parentheses, so
+            # the extent is found by balancing them rather than by cutting at the
+            # first ')'.
+            start = re.search(r"max_vertices\s*=\s*", text)
+            if not start:
+                problems.append("%s  declares no max_vertices" % rel)
+                continue
+            i, depth, expr = start.end(), 0, []
+            while i < len(text):
+                ch = text[i]
+                if ch == "(":
+                    depth += 1
+                    expr.append(ch)
+                elif ch == ")":
+                    if depth == 0:
+                        break           # the one closing max_vertices(...)
+                    depth -= 1
+                    expr.append(ch)
+                else:
+                    expr.append(ch)
+                i += 1
+            cap_expr = "".join(expr).strip()
+
+            # Resolve the cap, which is written as an expression over macros
+            # defined in the same file. The #if ladder means several values may
+            # be defined for one name; the last one wins, which is the highest
+            # density, and the highest density is the worst case.
+            env = {}
+            for macro, value in re.findall(r"#define\s+(\w+)\s+([0-9]+)", text):
+                env[macro] = int(value)
+            try:
+                cap = eval(cap_expr, {"__builtins__": {}}, env)  # noqa: S307
+            except Exception:
+                problems.append("%s  cannot evaluate max_vertices = %s; the "
+                                "budget cannot be checked" % (rel, cap_expr))
+                continue
+
+            # The worst case: the largest blade count times the vertices per
+            # blade, plus the original triangle.
+            blades = max((v for k, v in env.items()
+                          if k.endswith("MAX_BLADES")), default=None)
+            segs = max((v for k, v in env.items()
+                         if k.endswith("MAX_SEGMENTS")), default=None)
+            if blades is not None and segs is not None:
+                worst = blades * 2 * (segs + 1) + 3
+            else:
+                # No explicit blade budget: the largest count any blade loop can
+                # reach, times the vertices per blade, plus the triangle.
+                per_blade = 2 * (segs + 1) if segs else 3
+                counts = [env[c] + 1 for c in set(re.findall(
+                    r"for\s*\(\s*int\s+\w+\s*=\s*0\s*;\s*\w+\s*<=\s*(\w+)\s*;", text))
+                    if c in env]
+                worst = (max(counts) * per_blade + 3) if counts else 3
+
+            if worst > cap:
+                problems.append(
+                    "%s  can emit up to %d vertices in one invocation but "
+                    "declares max_vertices = %d (%s). The overrun is dropped "
+                    "silently, taking the original triangle and the depth with "
+                    "it." % (rel, worst, cap, cap_expr))
+            else:
+                print("ok    %-40s %d vertices worst case, cap %d"
+                      % ("geometry vertex budget", worst, cap))
+
+
 def programs():
     """The stub files the loader loads, i.e. the ones with a real stage."""
     for world in ("world0", "world1", "world-1", "worldx"):
@@ -868,6 +965,7 @@ def main():
     problems = []
     check_render_stage_enum(problems)
     check_geometry_chain(problems)
+    check_geometry_vertex_budget(problems)
     check_option_use(problems)
     check_reachable_options(problems)
     if problems:

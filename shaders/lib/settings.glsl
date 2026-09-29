@@ -77,13 +77,30 @@
 // existed. If that trade is wrong, the files are what to delete:
 //   world0, world1, world-1: gbuffers_terrain.tcs, .tes, .gsh
 //
-// On. The tessellation stages this was originally built with are gone - see
-// all_solid.gsh, which explains why - so what remains is a plain geometry stage,
-// which is a pass-through for every block that is not grass.
+// Off, and the geometry stage that implemented it has been removed.
 //
-// It has still never been run in game. GRASS_RANGE is the first thing to pull
-// back if it is expensive, and GRASS_DENSITY the second.
-#define SHADER_GRASS
+// It was four regressions in a row before it came out: distant artifacting, a
+// broken grass-block top face, mobs failing the depth test, and then a crash.
+// Every one of them was mine, and the first three I misdiagnosed at least once,
+// which is the real lesson - the failure modes of a geometry stage are silent,
+// so nothing short of seeing it in game tells you which one you have.
+//
+// The options are kept so the work is not lost, and the screen entry with them,
+// but nothing reads them while the stage is absent. If this is picked up again
+// it should start from a known-good state rather than from the stage, and it
+// should be put in front of a player before it is put in a release.
+//
+// #define SHADER_GRASS
+//
+// The settings that belonged to it:
+//   GRASS_DENSITY               blades per triangle
+//   GRASS_RANGE                 how far blades are drawn, in blocks
+//   GRASS_RANDOMNESS            per-blade lean
+//   GRASS_WAVY_STRENGTH         wave amplitude
+//   GRASS_BASE_THICKNESS        blade width
+//   GRASS_THICKNESS_FALLOFF     taper toward the tip
+//   BASE_GRASS_HEIGHT           length multiplier
+//   SHORT_GRASS_HEIGHT          per-blade length variation
 
 // How many blades a grass quad becomes, and how many segments each has. This is
 // the cost: every blade is a strip of quads built per triangle per frame, and

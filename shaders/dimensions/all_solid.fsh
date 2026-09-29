@@ -5,7 +5,7 @@
 #include "/lib/entities.glsl"
 #include "/lib/items.glsl"
 
-flat varying int NameTags_g;
+flat varying int NameTags;
 
 #ifdef HAND
 #undef POM
@@ -22,7 +22,7 @@ flat varying int NameTags_g;
 #endif
 
 
-varying float VanillaAO_g;
+varying float VanillaAO;
 
 const float mincoord = 1.0/4096.0;
 const float maxcoord = 1.0-mincoord;
@@ -35,29 +35,29 @@ uniform vec2 texelSize;
 uniform int framemod8;
 
 // #ifdef POM
-varying vec4 vtexcoordam_g; // .st for add, .pq for mul
-varying vec4 vtexcoord_g;
+varying vec4 vtexcoordam; // .st for add, .pq for mul
+varying vec4 vtexcoord;
 
-vec2 dcdx = dFdx(vtexcoord_g.st*vtexcoordam_g.pq)*exp2(Texture_MipMap_Bias);
-vec2 dcdy = dFdy(vtexcoord_g.st*vtexcoordam_g.pq)*exp2(Texture_MipMap_Bias);
+vec2 dcdx = dFdx(vtexcoord.st*vtexcoordam.pq)*exp2(Texture_MipMap_Bias);
+vec2 dcdy = dFdy(vtexcoord.st*vtexcoordam.pq)*exp2(Texture_MipMap_Bias);
 // #endif
 
 #include "/lib/res_params.glsl"
-varying vec4 lmtexcoord_g;
+varying vec4 lmtexcoord;
 
-varying vec4 color_g;
+varying vec4 color;
 
 uniform float far;
 
 
 uniform float wetness;
-varying vec4 normalMat_g;
+varying vec4 normalMat;
 
 
 #ifdef MC_NORMAL_MAP
 	uniform sampler2D normals;
-	varying vec4 tangent_g;
-	varying vec3 FlatNormals_g;
+	varying vec4 tangent;
+	varying vec3 FlatNormals;
 #endif
 
 
@@ -83,16 +83,16 @@ uniform vec4 entityColor;
 
 // in vec3 velocity;
 
-flat varying float blockID_g;
+flat varying float blockID;
 
-flat varying float SSSAMOUNT_g;
-flat varying float EMISSIVE_g;
-flat varying int LIGHTNING_g;
-flat varying int PORTAL_g;
-flat varying int SIGN_g;
+flat varying float SSSAMOUNT;
+flat varying float EMISSIVE;
+flat varying int LIGHTNING;
+flat varying int PORTAL;
+flat varying int SIGN;
 
 
-flat varying float HELD_ITEM_BRIGHTNESS_g;
+flat varying float HELD_ITEM_BRIGHTNESS;
 uniform float noPuddleAreas;
 
 
@@ -186,17 +186,17 @@ vec3 toClipSpace3(vec3 viewSpacePosition) {
 #ifdef POM
 	vec4 readNormal(in vec2 coord)
 	{
-		return texture2DGradARB(normals,fract(coord)*vtexcoordam_g.pq+vtexcoordam_g.st,dcdx,dcdy);
+		return texture2DGradARB(normals,fract(coord)*vtexcoordam.pq+vtexcoordam.st,dcdx,dcdy);
 	}
 	vec4 readTexture(in vec2 coord)
 	{
-		return texture2DGradARB(texture,fract(coord)*vtexcoordam_g.pq+vtexcoordam_g.st,dcdx,dcdy);
+		return texture2DGradARB(texture,fract(coord)*vtexcoordam.pq+vtexcoordam.st,dcdx,dcdy);
 	}
 #endif
 
 
-float luma(vec3 color_g) {
-	return dot(color_g,vec3(0.21, 0.72, 0.07));
+float luma(vec3 color) {
+	return dot(color,vec3(0.21, 0.72, 0.07));
 }
 
 
@@ -224,8 +224,8 @@ float ld(float dist) {
 
 
 vec4 readNoise(in vec2 coord){
-	// return texture2D(noisetex,coord*vtexcoordam_g.pq+vtexcoord_g.st);
-		return texture2DGradARB(noisetex,coord*vtexcoordam_g.pq + vtexcoordam_g.st,dcdx,dcdy);
+	// return texture2D(noisetex,coord*vtexcoordam.pq+vtexcoord.st);
+		return texture2DGradARB(noisetex,coord*vtexcoordam.pq + vtexcoordam.st,dcdx,dcdy);
 }
 float EndPortalEffect(
 	inout vec4 ALBEDO,
@@ -297,15 +297,15 @@ void main() {
 		ifPOM = true;
 	#endif
 
-	if(SIGN_g > 0) ifPOM = false;
+	if(SIGN > 0) ifPOM = false;
 
-	vec3 normal = normalMat_g.xyz;
+	vec3 normal = normalMat.xyz;
 
 	#ifdef MC_NORMAL_MAP
-		vec3 tangent2 = normalize(cross(tangent_g.rgb,normal)*tangent_g.w);
-		mat3 tbnMatrix = mat3(tangent_g.x, tangent2.x, normal.x,
-							  tangent_g.y, tangent2.y, normal.y,
-							  tangent_g.z, tangent2.z, normal.z);
+		vec3 tangent2 = normalize(cross(tangent.rgb,normal)*tangent.w);
+		mat3 tbnMatrix = mat3(tangent.x, tangent2.x, normal.x,
+							  tangent.y, tangent2.y, normal.y,
+							  tangent.z, tangent2.z, normal.z);
 	#endif
 
 	vec2 tempOffset = offsets[framemod8];
@@ -313,7 +313,7 @@ void main() {
 	vec3 fragpos = toScreenSpace(gl_FragCoord.xyz*vec3(texelSize/RENDER_SCALE,1.0)-vec3(vec2(tempOffset)*texelSize*0.5,0.0));
 	vec3 worldpos = mat3(gbufferModelViewInverse) * fragpos  + gbufferModelViewInverse[3].xyz + cameraPosition;
 
-	float torchlightmap = lmtexcoord_g.z;
+	float torchlightmap = lmtexcoord.z;
 
 	#if defined Hand_Held_lights && !defined LPV_ENABLED
 		#ifdef IS_IRIS
@@ -322,14 +322,14 @@ void main() {
 			vec3 playerCamPos = cameraPosition;
 		#endif
 
-		if(HELD_ITEM_BRIGHTNESS_g > 0.0) torchlightmap = max(torchlightmap, HELD_ITEM_BRIGHTNESS_g * clamp( pow(max(1.0-length(worldpos-playerCamPos)/HANDHELD_LIGHT_RANGE,0.0),1.5),0.0,1.0));
+		if(HELD_ITEM_BRIGHTNESS > 0.0) torchlightmap = max(torchlightmap, HELD_ITEM_BRIGHTNESS * clamp( pow(max(1.0-length(worldpos-playerCamPos)/HANDHELD_LIGHT_RANGE,0.0),1.5),0.0,1.0));
 
 		#ifdef HAND
 			torchlightmap *= 0.9;
 		#endif
 	#endif
 	
-	float lightmap = clamp( (lmtexcoord_g.w-0.9) * 10.0,0.,1.);
+	float lightmap = clamp( (lmtexcoord.w-0.9) * 10.0,0.,1.);
 
 	float rainfall = 0.0;
 	float Puddle_shape = 0.0;
@@ -344,11 +344,11 @@ void main() {
 	#endif
 
 	
-	vec2 adjustedTexCoord = lmtexcoord_g.xy;
+	vec2 adjustedTexCoord = lmtexcoord.xy;
 
 #if defined POM && defined WORLD && !defined ENTITIES && !defined HAND
 	// vec2 tempOffset=offsets[framemod8];
-	adjustedTexCoord = fract(vtexcoord_g.st)*vtexcoordam_g.pq+vtexcoordam_g.st;
+	adjustedTexCoord = fract(vtexcoord.st)*vtexcoordam.pq+vtexcoordam.st;
 	// vec3 fragpos = toScreenSpace(gl_FragCoord.xyz*vec3(texelSize/RENDER_SCALE,1.0)-vec3(vec2(tempOffset)*texelSize*0.5,0.0));
 	vec3 viewVector = normalize(tbnMatrix*fragpos);
 	float dist = length(fragpos);
@@ -359,7 +359,7 @@ void main() {
 	gl_FragDepth = gl_FragCoord.z;
 	if (dist < maxdist) {
 
-		float depthmap = readNormal(vtexcoord_g.st).a;
+		float depthmap = readNormal(vtexcoord.st).a;
 		float used_POM_DEPTH = 1.0;
 
  		if ( viewVector.z < 0.0 && depthmap < 0.9999 && depthmap > 0.00001) {	
@@ -370,7 +370,7 @@ void main() {
 			#else
 				vec3 interval = viewVector.xyz /-viewVector.z/MAX_OCCLUSION_POINTS*POM_DEPTH;
 			#endif
-			vec3 coord = vec3(vtexcoord_g.st , 1.0);
+			vec3 coord = vec3(vtexcoord.st , 1.0);
 
 			coord += interval * noise * used_POM_DEPTH;
 
@@ -387,7 +387,7 @@ void main() {
 				}
 			}
 			
-			adjustedTexCoord = mix(fract(coord.st)*vtexcoordam_g.pq+vtexcoordam_g.st, adjustedTexCoord, max(dist-MIX_OCCLUSION_DISTANCE,0.0)/(MAX_OCCLUSION_DISTANCE-MIX_OCCLUSION_DISTANCE));
+			adjustedTexCoord = mix(fract(coord.st)*vtexcoordam.pq+vtexcoordam.st, adjustedTexCoord, max(dist-MIX_OCCLUSION_DISTANCE,0.0)/(MAX_OCCLUSION_DISTANCE-MIX_OCCLUSION_DISTANCE));
 
 			vec3 truePos = fragpos + sumVec*inverseMatrix(tbnMatrix)*interval;
 
@@ -395,24 +395,24 @@ void main() {
 		}
 	}
 #endif
-	if(!ifPOM) adjustedTexCoord = lmtexcoord_g.xy;
+	if(!ifPOM) adjustedTexCoord = lmtexcoord.xy;
 	
 
 	//////////////////////////////// 				////////////////////////////////
 	////////////////////////////////	ALBEDO		////////////////////////////////
 	//////////////////////////////// 				//////////////////////////////// 
 	float textureLOD = bias();
-	vec4 Albedo = texture2D_POMSwitch(texture, adjustedTexCoord.xy, vec4(dcdx,dcdy), ifPOM, textureLOD) * color_g;
+	vec4 Albedo = texture2D_POMSwitch(texture, adjustedTexCoord.xy, vec4(dcdx,dcdy), ifPOM, textureLOD) * color;
 	
 	#if defined HAND
 		if (Albedo.a < 0.1) discard;
 	#endif
 
-	if(LIGHTNING_g > 0) Albedo = vec4(1);
+	if(LIGHTNING > 0) Albedo = vec4(1);
 
 	// float ENDPORTAL_EFFECT = 0.0;
 	// #ifndef ENTITIES
-	// 	ENDPORTAL_EFFECT = PORTAL_g > 0 ? EndPortalEffect(Albedo, fragpos, worldpos, tbnMatrix) : 0;
+	// 	ENDPORTAL_EFFECT = PORTAL > 0 ? EndPortalEffect(Albedo, fragpos, worldpos, tbnMatrix) : 0;
 	// #endif
 	
 	#ifdef WhiteWorld
@@ -423,26 +423,26 @@ void main() {
 	#ifdef AEROCHROME_MODE
 		float gray = dot(Albedo.rgb, vec3(0.2, 1.0, 0.07));
 		if (
-			blockID_g == BLOCK_AMETHYST_BUD_MEDIUM || blockID_g == BLOCK_AMETHYST_BUD_LARGE || blockID_g == BLOCK_AMETHYST_CLUSTER 
-			|| blockID_g == BLOCK_SSS_STRONG || blockID_g == BLOCK_SSS_WEAK
-			|| blockID_g == BLOCK_GLOW_LICHEN || blockID_g == BLOCK_SNOW_LAYERS
-			|| blockID_g >= 10 && blockID_g < 80
+			blockID == BLOCK_AMETHYST_BUD_MEDIUM || blockID == BLOCK_AMETHYST_BUD_LARGE || blockID == BLOCK_AMETHYST_CLUSTER 
+			|| blockID == BLOCK_SSS_STRONG || blockID == BLOCK_SSS_WEAK
+			|| blockID == BLOCK_GLOW_LICHEN || blockID == BLOCK_SNOW_LAYERS
+			|| blockID >= 10 && blockID < 80
 		) {
 			// IR Reflective (Pink-red)
 			Albedo.rgb = mix(vec3(gray), aerochrome_color, 0.7);
 		}
-		else if(blockID_g == BLOCK_GRASS) {
+		else if(blockID == BLOCK_GRASS) {
 		// Special handling for grass block
-			float strength = 1.0 - color_g.b;
+			float strength = 1.0 - color.b;
 			Albedo.rgb = mix(Albedo.rgb, aerochrome_color, strength);
 		}
 		#ifdef AEROCHROME_WOOL_ENABLED
-			else if (blockID_g == BLOCK_SSS_WEAK_2 || blockID_g == BLOCK_CARPET) {
+			else if (blockID == BLOCK_SSS_WEAK_2 || blockID == BLOCK_CARPET) {
 			// Wool
 				Albedo.rgb = mix(Albedo.rgb, aerochrome_color, 0.3);
 			}
 		#endif
-		else if(blockID_g == BLOCK_WATER || (blockID_g >= 300 && blockID_g < 400))
+		else if(blockID == BLOCK_WATER || (blockID >= 300 && blockID < 400))
 		{
 		// IR Absorbsive? Dark.
 			Albedo.rgb = mix(Albedo.rgb, vec3(0.01, 0.08, 0.15), 0.5);
@@ -450,7 +450,7 @@ void main() {
 	#endif
 
 	#ifdef WORLD
-		if (Albedo.a > 0.1) Albedo.a = normalMat_g.a;
+		if (Albedo.a > 0.1) Albedo.a = normalMat.a;
 		else Albedo.a = 0.0;
 	#endif
 
@@ -503,12 +503,12 @@ void main() {
 		#endif
 
 		#if EMISSIVE_TYPE == 1
-			gl_FragData[1].a = EMISSIVE_g;
+			gl_FragData[1].a = EMISSIVE;
 		#endif
 
 		#if EMISSIVE_TYPE == 2
 			gl_FragData[1].a = SpecularTex.a;
-			if(SpecularTex.a <= 0.0) gl_FragData[1].a = EMISSIVE_g;
+			if(SpecularTex.a <= 0.0) gl_FragData[1].a = EMISSIVE;
 		#endif
 
 		#if EMISSIVE_TYPE == 3		
@@ -520,12 +520,12 @@ void main() {
 		#endif
 
 		#if SSS_TYPE == 1
-			gl_FragData[1].b = SSSAMOUNT_g;
+			gl_FragData[1].b = SSSAMOUNT;
 		#endif
 
 		#if SSS_TYPE == 2
 			gl_FragData[1].b = SpecularTex.b;
-			if(SpecularTex.b < 65.0/255.0) gl_FragData[1].b = SSSAMOUNT_g;
+			if(SpecularTex.b < 65.0/255.0) gl_FragData[1].b = SSSAMOUNT;
 		#endif
 
 		#if SSS_TYPE == 3		
@@ -554,7 +554,7 @@ void main() {
 		#endif
 
 		// apply noise to lightmaps to reduce banding.
-		vec2 PackLightmaps = vec2(torchlightmap, lmtexcoord_g.w);
+		vec2 PackLightmaps = vec2(torchlightmap, lmtexcoord.w);
 		
 		vec4 data1 = clamp( encode(viewToWorld(normal), PackLightmaps), 0.0, 1.0);
 		
@@ -562,21 +562,21 @@ void main() {
 
 		// The geometric normal goes in the alpha of colortex2, remapped to 0-1.
 		//
-		// This was an unguarded use of FlatNormals_g, which is only declared under
+		// This was an unguarded use of FlatNormals, which is only declared under
 		// MC_NORMAL_MAP. POM implies MC_NORMAL_MAP (both stages #define it), so
 		// with POM on - and POM on implies the guard was satisfied - it compiled.
 		// With POM off, which is the default, MC_NORMAL_MAP is not defined by
 		// anything and the name does not exist, so this is a compile error:
 		//
-		//   'FlatNormals_g' : undeclared identifier
+		//   'FlatNormals' : undeclared identifier
 		//
 		// The fragment-stage normal is the same vector the vertex stage would have
 		// passed through, and it is what the lighting pass reads back, so falling
 		// back to it is not an approximation.
 		#ifdef MC_NORMAL_MAP
-			gl_FragData[2] = vec4(FlatNormals_g * 0.5 + 0.5, VanillaAO_g);
+			gl_FragData[2] = vec4(FlatNormals * 0.5 + 0.5, VanillaAO);
 		#else
-			gl_FragData[2] = vec4(normal * 0.5 + 0.5, VanillaAO_g);
+			gl_FragData[2] = vec4(normal * 0.5 + 0.5, VanillaAO);
 		#endif
 	#endif
 	
