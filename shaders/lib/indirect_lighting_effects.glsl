@@ -391,26 +391,11 @@ vec3 ApplySSRT(
 			vec3 rayHit = RT_alternate(mat3(gbufferModelView)*rayDir, viewPos, noise.z, 10., isLOD);  // choc sspt 
 		#endif
 
-		// The block light must NOT ride in skycontribution.
-		//
-		// It used to, as `... + blockLightColor` on both lines below. That put
-		// the same value into both accumulators: `radiance += skycontribution`
-		// runs for every ray, and `occlusion += skycontribution` runs for every
-		// ray that hits geometry, and the return is (radiance - occlusion)/nrays.
-		// So the block term cancelled in proportion to how enclosed the scene is -
-		// fully in the open, nothing at all in a room, which is the only place a
-		// torch is used. A torch in a cave contributed exactly nothing, and
-		// outdoors it was scaled by the fraction of rays that missed geometry.
-		//
-		// It belongs outside this function entirely: it is the volume's own answer
-		// for this pixel, not a per-ray sample, and it has already been added to
-		// Indirect_lighting by the caller. It is added back below, after the
-		// accumulators have been differenced.
 		#ifdef SKY_CONTRIBUTION_IN_SSRT
 			#ifdef OVERWORLD_SHADER
-				skycontribution = doIndirectLighting(pow(skyCloudsFromTexLOD(rayDir, colortex4, 0).rgb/30.0, vec3(0.7)) * 2.5, minimumLightColor, lightmap);
+				skycontribution = doIndirectLighting(pow(skyCloudsFromTexLOD(rayDir, colortex4, 0).rgb/30.0, vec3(0.7)) * 2.5, minimumLightColor, lightmap) + blockLightColor;
 			#else
-				skycontribution = pow(skyCloudsFromTexLOD2(rayDir, colortex4, 6).rgb / 30.0, vec3(0.7));
+				skycontribution = pow(skyCloudsFromTexLOD2(rayDir, colortex4, 6).rgb / 30.0, vec3(0.7)) + blockLightColor;
 			#endif
 		#else
 			#ifdef OVERWORLD_SHADER
@@ -476,22 +461,13 @@ vec3 ApplySSRT(
 		}
 	}
 
-	// The block light goes back in here, once, after the accumulators have been
-	// differenced. See the note where it was taken out: inside the loop it was
-	// added to both sides of the subtraction and cancelled, so a torch lit
-	// nothing in a room and was scaled down outdoors.
-	//
-	// It is the same value the caller already added to Indirect_lighting before
-	// calling, and this function's result replaces that - see composite1.fsh,
-	// where `Indirect_lighting = ApplySSRT(...)`. So it is added here once
-	// rather than left to the caller, which would mean it was counted nowhere.
-	if(isLOD) return max(radiance/nrays, 0.0) + blockLightColor;
+	if(isLOD) return max(radiance/nrays, 0.0);
 
 	#ifdef SKY_CONTRIBUTION_IN_SSRT
-		return max((radiance - occlusion)/nrays,0.0) + blockLightColor;
+		return max((radiance - occlusion)/nrays,0.0);
 	#else
 		float threshold = isGrass ? 0.8 : (pow(1.0-lightmap,2.0) * 0.9 + 0.1);
-		return max((radiance - occlusion)/nrays, (radiance2 - occlusion2)/nrays * threshold) + blockLightColor;
+		return max((radiance - occlusion)/nrays, (radiance2 - occlusion2)/nrays * threshold);
 	#endif
 
 }

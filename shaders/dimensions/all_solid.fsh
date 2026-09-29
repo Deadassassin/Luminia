@@ -560,7 +560,24 @@ void main() {
 		
 		gl_FragData[0] = vec4(encodeVec2(Albedo.x,data1.x),	encodeVec2(Albedo.y,data1.y),	encodeVec2(Albedo.z,data1.z),	encodeVec2(data1.w,Albedo.w));
 
-		gl_FragData[2] = vec4(FlatNormals * 0.5 + 0.5, VanillaAO);	
+		// The geometric normal goes in the alpha of colortex2, remapped to 0-1.
+		//
+		// This was an unguarded use of FlatNormals, which is only declared under
+		// MC_NORMAL_MAP. POM implies MC_NORMAL_MAP (both stages #define it), so
+		// with POM on - and POM on implies the guard was satisfied - it compiled.
+		// With POM off, which is the default, MC_NORMAL_MAP is not defined by
+		// anything and the name does not exist, so this is a compile error:
+		//
+		//   'FlatNormals' : undeclared identifier
+		//
+		// The fragment-stage normal is the same vector the vertex stage would have
+		// passed through, and it is what the lighting pass reads back, so falling
+		// back to it is not an approximation.
+		#ifdef MC_NORMAL_MAP
+			gl_FragData[2] = vec4(FlatNormals * 0.5 + 0.5, VanillaAO);
+		#else
+			gl_FragData[2] = vec4(normal * 0.5 + 0.5, VanillaAO);
+		#endif
 	#endif
 	
 }

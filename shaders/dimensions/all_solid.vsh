@@ -222,7 +222,15 @@ void main() {
 	#endif
 
 	normalMat = vec4(normalize(gl_NormalMatrix * gl_Normal), 1.0);
-	FlatNormals = normalMat.xyz;
+	#ifdef MC_NORMAL_MAP
+		// Only exists when a resource pack supplies normal maps, so only written
+		// then. It is read in exactly one place, below, and that read is
+		// unguarded because WAVY_PLANTS is on by default - which is a compile
+		// error for a pack without normal maps. That read uses normalMat.xyz,
+		// which is assigned here and is the same vector, so nothing is lost by
+		// not writing an output that may not exist.
+		FlatNormals = normalMat.xyz;
+	#endif
 
 	blockID = mc_Entity.x ;
 
@@ -331,7 +339,17 @@ void main() {
 
 	#ifdef WAVY_PLANTS
 		// also use normal, so up/down facing geometry does not get detatched from its model parts.
-		bool InterpolateFromBase = gl_MultiTexCoord0.t < max(mc_midTexCoord.t, abs(viewToWorld(FlatNormals).y));
+		//
+		// normalMat.xyz, not FlatNormals. The two are the same vector - the
+		// assignment above is `FlatNormals = normalMat.xyz` - but FlatNormals is
+		// only declared under MC_NORMAL_MAP, and this is under WAVY_PLANTS, which
+		// is on by default. So naming it here is a compile error whenever the
+		// resource pack has no normal map:
+		//
+		//   'FlatNormals' : undeclared identifier
+		//
+		// Reading normalMat.xyz instead is the same value and needs no guard.
+		bool InterpolateFromBase = gl_MultiTexCoord0.t < max(mc_midTexCoord.t, abs(viewToWorld(normalMat.xyz).y));
 
 		if(	
 			(

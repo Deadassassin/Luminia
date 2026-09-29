@@ -59,6 +59,65 @@
 #define WAVY_STRENGTH 1.0 // [0.1 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0]
 #define WAVY_SPEED 1.0 // [0.001 0.01 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 1.0 1.25 1.5 2.0 3.0 4.0]
 
+/////////////////////////////////////////////////
+// ----- SHADER GRASS (GEOMETRY REPLACEMENT) -- //
+/////////////////////////////////////////////////
+
+// Short grass and flowers are not billboards in this pack. They are replaced,
+// per triangle, by a real blade: the geometry stage turns each quad into a
+// vertical strip of quads, and the blade bends with the same wave the rest of
+// the foliage uses, so it moves with the grass around it rather than sliding
+// over it.
+//
+// The cost is large and it is paid whether or not it looks good, because the
+// tessellation and geometry programs exist either way and the loader draws them
+// whether the option is on or off - there is no way for a pack to make a file
+// it has shipped conditional. This is the one option in the pack where being
+// off does not make the frame rate go back to what it was before the option
+// existed. If that trade is wrong, the files are what to delete:
+//   world0, world1, world-1: gbuffers_terrain.tcs, .tes, .gsh
+//
+// On. The tessellation stages this was originally built with are gone - see
+// all_solid.gsh, which explains why - so what remains is a plain geometry stage,
+// which is a pass-through for every block that is not grass.
+//
+// It has still never been run in game. GRASS_RANGE is the first thing to pull
+// back if it is expensive, and GRASS_DENSITY the second.
+#define SHADER_GRASS
+
+// How many blades a grass quad becomes, and how many segments each has. This is
+// the cost: every blade is a strip of quads built per triangle per frame, and
+// the geometry is built for every quad inside GRASS_RANGE whether or not it ends
+// up on screen.
+//
+// It also sets max_vertices on the geometry stage, which has to be a
+// compile-time constant, so it is read at compile time rather than being a
+// uniform. Changing it recompiles the stage.
+#define GRASS_DENSITY 2 // [0 1 2 3]
+
+// How far the blades are drawn, in blocks. The cost is very nearly linear in
+// this: every quad inside it is subdivided before the geometry stage throws most
+// of it away, so the expensive part is not the blades you can see but the ones
+// the tessellator had to consider.
+#define GRASS_RANGE 24.0 // [8.0 10.0 12.0 16.0 20.0 24.0 28.0 32.0 40.0 48.0 64.0]
+
+// How much each blade leans off vertical, and how much of that is random per
+// blade rather than shared. A field of identically-vertical blades reads as a
+// carpet; the randomness is what makes it read as grass.
+#define GRASS_RANDOMNESS 0.5 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
+#define GRASS_WAVY_STRENGTH 1.0 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 2.0]
+
+// The blade's width and how fast it tapers toward the tip. A blade that does
+// not taper is a rectangle, and a field of rectangles is a fence.
+#define GRASS_BASE_THICKNESS 0.3 // [0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7]
+#define GRASS_THICKNESS_FALLOFF 0.8 // [0.5 0.6 0.7 0.8 0.9 1.0]
+
+// How tall a blade is, as a multiple. BASE is the common case and SHORT is the
+// per-blade variation on top of it, so a field has some tall and some short
+// rather than all of one or all of the other.
+#define BASE_GRASS_HEIGHT 1.0 // [0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5]
+#define SHORT_GRASS_HEIGHT 1.0 // [0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5]
+
 // Seasons colour the foliage and the light by which one the world is in. It
 // cycles on its own from Start_Season, so the world a player walks into depends
 // on when they walked in - which is the point of the pack.

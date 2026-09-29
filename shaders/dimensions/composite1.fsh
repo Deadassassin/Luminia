@@ -1166,20 +1166,7 @@ void main() {
 		#endif
 
 		vec3 blockLightColor = doBlockLightLighting( vec3(TORCH_R,TORCH_G,TORCH_B), lightmap.x, exposure, feetPlayerPos, lpvPos);
-
-		// Not added here when ApplySSRT will run, because that call replaces
-		// Indirect_lighting wholesale with its return value, and ApplySSRT already
-		// folds blockLightColor into that return - see the note in
-		// lib/indirect_lighting_effects.glsl. Adding it here too would count it
-		// twice on that path.
-		//
-		// `hand` is part of the condition, not an afterthought: the call below is
-		// guarded by `if(!hand)`, so the hand path never reaches ApplySSRT and
-		// would otherwise lose its block light entirely. The hand is the one thing
-		// always near a light source, so a torch in view would stop lighting it.
-		#if (indirect_effect != 3 && indirect_effect != 4) || hand
-			Indirect_lighting += blockLightColor;
-		#endif
+		Indirect_lighting += blockLightColor;
 
 	/////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////	EFFECTS FOR INDIRECT	/////////////////////////////

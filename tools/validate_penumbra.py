@@ -75,30 +75,12 @@ ENGINE_DEFINES = r"""
 #define MC_RENDER_QUALITY 0
 #define MC_HAND_DEPTH 0
 
-#define MC_RENDER_STAGE_NONE                   0
-#define MC_RENDER_STAGE_SKY                    1
-#define MC_RENDER_STAGE_SUNSET                 2
-#define MC_RENDER_STAGE_CUSTOM_SKY             3
-#define MC_RENDER_STAGE_SUN                    4
-#define MC_RENDER_STAGE_MOON                   5
-#define MC_RENDER_STAGE_STARS                  6
-#define MC_RENDER_STAGE_VOID                   7
-#define MC_RENDER_STAGE_TERRAIN_SOLID          8
-#define MC_RENDER_STAGE_ENTITIES               9
-#define MC_RENDER_STAGE_BLOCK_ENTITIES         10
-#define MC_RENDER_STAGE_DESTROY                11
-#define MC_RENDER_STAGE_OUTLINE                12
-#define MC_RENDER_STAGE_DEBUG                  13
-#define MC_RENDER_STAGE_HAND_SOLID             14
-#define MC_RENDER_STAGE_TERRAIN_TRANSLUCENT    15
-#define MC_RENDER_STAGE_TRIPWIRE               16
-#define MC_RENDER_STAGE_PARTICLES              17
-#define MC_RENDER_STAGE_CLOUDS                 18
-#define MC_RENDER_STAGE_RAIN_SNOW              19
-#define MC_RENDER_STAGE_WORLD_BORDER           20
-#define MC_RENDER_STAGE_HAND_TRANSLUCENT       21
-#define MC_RENDER_STAGE_TERRAIN_CUTOUT         22
-#define MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED  23
+// MC_RENDER_STAGE_* is deliberately absent. This engine supplies `renderStage`
+// but not the macros, so the pack defines them itself in lib/voxel_write.glsl -
+// and defining them here as well made the shadow pass fail with a macro
+// redefinition, which reads as a pack fault and is not one. Their values are
+// checked against the engine by check_render_stage_enum, which reads the jar.
+
 
 #define MC_GL_VERSION 460
 #define MC_GL_VENDOR_AMD 0
@@ -389,15 +371,14 @@ def stand_in_for_loader(source, stage):
         stages = VERTEX_STAGES if "v" in where else None
         if where == "b" or (stages and stage in stages):
             decls.append("uniform %s fx_%s;" % (type_, name))
-    if stage == "comp":
-        # A compute stage writes through image stores, not colour attachments.
-        pass
-    else:
+    # Located colour outputs exist only in a fragment stage. A compute stage
+    # writes through image stores, and a vertex, geometry or tessellation stage
+    # has no colour attachments at all - declaring one there is an error, and it
+    # is the error a geometry program gets for being treated as a fragment one.
+    if stage == "frag":
         for i in range(top + 1):
             decls.append("layout(location = %d) out vec4 fxOut%d;" % (i, i))
-        if re.search(r"\bgl_FragColor\b", source):
-            decls.append("vec4 fx_gl_Fog;")
-        elif re.search(r"\bgl_Fog\b", source):
+        if re.search(r"\bgl_FragColor\b|\bgl_Fog\b", source):
             decls.append("vec4 fx_gl_Fog;")
 
     text = "\n".join([TARGET_VERSION, ENGINE_DEFINES, shadow2D_decl]

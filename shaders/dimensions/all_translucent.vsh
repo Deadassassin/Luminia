@@ -69,6 +69,16 @@ uniform int heldItemId;
 uniform int heldItemId2;
 flat varying float HELD_ITEM_BRIGHTNESS;
 
+// The engine's uniform for the entity being drawn, read below to spot the
+// trident. It was named there without ever being declared in this file, which
+// compiles to nothing in the two programs that take that branch - the
+// translucent entity and translucent block entity - and nowhere else in the
+// pack. all_solid.vsh declares the same uniform for the same purpose, so this
+// is the same name with the same meaning.
+#if defined ENTITIES || defined BLOCKENTITIES
+	uniform int entityId;
+#endif
+
 uniform vec2 texelSize;
 uniform int framemod8;
 
