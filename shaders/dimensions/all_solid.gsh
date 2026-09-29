@@ -127,6 +127,9 @@ flat out int SIGN_g;
 
 uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
+// gl_ProjectionMatrix is not declared here: the loader supplies it, exactly as
+// it does to the vertex stage that calls toClipSpace3. viewPosFromClip needs it
+// and receives it the same way.
 uniform vec3 cameraPosition;
 uniform vec3 relativeEyePosition;
 uniform float frameTimeCounter;
@@ -143,6 +146,32 @@ uniform sampler2D noisetex;
 vec4 toClipSpace3(vec3 viewSpacePosition) {
 	return vec4(projMAD(gl_ProjectionMatrix, viewSpacePosition),
 	            -viewSpacePosition.z);
+}
+
+// The inverse of toClipSpace3, and the reason this function has to exist.
+//
+// gl_Position is CLIP space - the position already pushed through the
+// projection - and a geometry stage is handed nothing but gl_Position and the
+// varyings. The blades are built in view space, because that is what the wave
+// function and the height offsets are defined in, so the vertex positions have
+// to come back out of the projection before anything is built from them.
+//
+// This was the bug that made the grass invisible. The blade positions were
+// computed from gl_Position.xyz as though it were a view-space position, which
+// it is not: it is a projected coordinate. Every blade was placed at a nonsense
+// point - usually behind the camera or far off to one side - and the stray
+// geometry that produced also punched through the faces it was drawn over,
+// which is what "seeing through grass" was.
+//
+// toClipSpace3 is invertible because it is affine in the position:
+//   clip.xyz = diagonal3(P) * viewPos + P[3].xyz
+//   clip.w   = -viewPos.z
+// so viewPos = (clip.xyz - P[3].xyz) / diagonal3(P), and z is handed over
+// directly by w. The divide is by the projection's own diagonal rather than by
+// w, which is the unusual part of this pack's projection and the reason the
+// usual xyz/w does not recover a position here.
+vec3 viewPosFromClip(vec4 clipPos) {
+	return (clipPos.xyz - gl_ProjectionMatrix[3].xyz) / diagonal3(gl_ProjectionMatrix);
 }
 
 const float PI48 = 150.796447372 * WAVY_SPEED;
@@ -224,7 +253,11 @@ void main() {
 	    !defined HAND && !defined BLOCKENTITIES
 
 		vec3 worldNormal = viewToWorld(normalMat[0].xyz);
-		float viewDist = gl_in[0].gl_Position.w;
+		// Distance is taken from the view-space position, not from gl_Position.w.
+		// This pack's projection puts -viewZ in w rather than the usual
+		// perspective w, so the two agree here - but reading it from the position
+		// the rest of this stage works in keeps it in one set of units.
+		float viewDist = length(viewPosFromClip(gl_in[0].gl_Position));
 
 		// Which blocks get blades, and which of their faces.
 		//
@@ -254,6 +287,18 @@ void main() {
 		bool isGrassBlock = blockID[0] == BLOCK_GRASS && worldNormal.y > 0.9;
 		bool isShortGrass = blockID[0] == BLOCK_GRASS_SHORT && worldNormal.y > 0.9;
 
+		// The triangle's three vertices, back in view space.
+		//
+		// gl_Position is clip space - the position already pushed through the
+		// projection - and everything below is built in view space, because that is
+		// what the wave function and the height offsets are defined in. So the
+		// positions come out of the projection before anything is computed from
+		// them. Using gl_Position.xyz as though it were a view-space position puts
+		// every blade at a nonsense point, usually off screen or behind the camera.
+		vec3 v0 = viewPosFromClip(gl_in[0].gl_Position);
+		vec3 v1 = viewPosFromClip(gl_in[1].gl_Position);
+		vec3 v2 = viewPosFromClip(gl_in[2].gl_Position);
+
 		// A short-grass cross is two intersecting quads, so one of them always
 		// faces away from the camera. Growing blades from both doubles the density
 		// at some angles and leaves a gap at others, and - worse - the two sets
@@ -265,25 +310,18 @@ void main() {
 		// fragment-stage input, and this is a geometry stage. The geometric facing
 		// is computed instead, from the triangle's own normal and the view ray.
 		if (isShortGrass) {
-			vec3 triNormal = normalize(cross(
-				gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz,
-				gl_in[2].gl_Position.xyz - gl_in[0].gl_Position.xyz));
+			vec3 triNormal = normalize(cross(v1 - v0, v2 - v0));
 			// View space has the camera at the origin looking down -z, so the
 			// vector from the camera to the triangle is its own centroid, and the
 			// dot is positive when the triangle faces the camera.
-			vec3 centreDir = (gl_in[0].gl_Position.xyz +
-			                  gl_in[1].gl_Position.xyz +
-			                  gl_in[2].gl_Position.xyz) / 3.0;
-			if (dot(triNormal, centreDir) < 0.0) isShortGrass = false;
+			if (dot(triNormal, (v0 + v1 + v2) / 3.0) < 0.0) isShortGrass = false;
 		}
 
 		bool isGrass = (isGrassBlock || isShortGrass) && viewDist < GRASS_RANGE;
 
 		if (isGrass) {
 			// The triangle's centre, in view space. The blades stand on it.
-			vec3 centre = (gl_in[0].gl_Position.xyz +
-			               gl_in[1].gl_Position.xyz +
-			               gl_in[2].gl_Position.xyz) / 3.0;
+			vec3 centre = (v0 + v1 + v2) / 3.0;
 			vec3 worldCentre = viewToWorld(centre);
 
 			// World up, in view space - the direction a blade climbs. Derived
@@ -331,8 +369,8 @@ void main() {
 			// every blade in a line down the middle of the block and leaves the
 			// corners bare. Barycentric placement over the triangle is what turns
 			// the count into coverage.
-			vec3 edgeA = gl_in[1].gl_Position.xyz - gl_in[0].gl_Position.xyz;
-			vec3 edgeB = gl_in[2].gl_Position.xyz - gl_in[0].gl_Position.xyz;
+			vec3 edgeA = v1 - v0;
+			vec3 edgeB = v2 - v0;
 
 			// Blade length. Two independent randoms, so a field has blades that
 			// lean left and blades that lean right rather than one direction for
@@ -379,7 +417,7 @@ void main() {
 				float sum = max(u + v + w, 1e-4);
 				u /= sum; v /= sum;
 
-				vec3 base = gl_in[0].gl_Position.xyz + edgeA * u + edgeB * v;
+				vec3 base = v0 + edgeA * u + edgeB * v;
 
 				// Each blade leans its own way.
 				float jitter = fract(len * 7.0 + float(b) * 0.618);
