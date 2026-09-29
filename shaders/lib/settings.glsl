@@ -7,7 +7,7 @@
 ////////////////////////////////////////
 
 // #define Vanilla_like_water
-#define WATER_WAVE_STRENGTH 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
+#define WATER_WAVE_STRENGTH 0.8 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define WATER_WAVE_SPEED 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 
 // Ripples on the water where the player disturbs it - wading, swimming, walking
@@ -41,7 +41,7 @@
 
 #define Refraction
 
-#define SSR_STEPS 30 // [10 15 20 25 30 35 40 50 100 200 400]
+#define SSR_STEPS 400 // [10 15 20 25 30 35 40 50 100 200 400]
 #define USE_QUARTER_RES_DEPTH
 #define WATER_REFLECTIONS
 #define WATER_BACKGROUND_SPECULAR
@@ -59,9 +59,12 @@
 #define WAVY_STRENGTH 1.0 // [0.1 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0]
 #define WAVY_SPEED 1.0 // [0.001 0.01 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 1.0 1.25 1.5 2.0 3.0 4.0]
 
-// #define Seasons
+// Seasons colour the foliage and the light by which one the world is in. It
+// cycles on its own from Start_Season, so the world a player walks into depends
+// on when they walked in - which is the point of the pack.
+#define Seasons
 #define Season_Length 24 //  [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91]
-#define Start_Season 0 // [0 1 2 3]
+#define Start_Season 2 // [0 1 2 3]
 // #define Snowy_Winter
 
 #define Summer_R 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
@@ -95,8 +98,17 @@
 // ----- INDIRECT LIGHT RELATED SETTINGS ----- //
 /////////////////////////////////////////////////
 
-#define MIN_LIGHT_AMOUNT 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 15.0 20.0 25.0 30.0 35.0 40.0 45.0 50.0 100.0 ]
-#define ambient_brightness 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]
+// The floor of light that exists with no source at all. 0.0 is the honest
+// value: unlit ground with nothing lighting it is black, and a floor is a way
+// of saying "never quite black". It is scaled by ambient_brightness in
+// diffuse_lighting.glsl, so the two are one decision between them - a floor on
+// its own cannot be turned down without also dimming the lit world.
+#define MIN_LIGHT_AMOUNT 0.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 15.0 20.0 25.0 30.0 35.0 40.0 45.0 50.0 100.0 ]
+// How much of the sky's own light reaches a surface. 1.0 is "all of it", which
+// is what a clear-sky surface actually receives; below that the sky reads as
+// dimmer than it looks, which is the trade for being able to see into a cave
+// mouth. It scales the whole indirect term, not just the floor.
+#define ambient_brightness 0.2 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]
 
 #define AmbientLight_R 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define AmbientLight_G 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
@@ -132,39 +144,32 @@
 //      one that looks lit: light off a red wall onto a pale floor, a torch
 //      throwing orange onto the ceiling above it.
 //
-// Note that the original comment here claimed 3 was "the one that reads as real
-// bounce light". ApplySSRT's arithmetic does not agree, which is why this ships
-// on 3 by default and nobody could work out why their scene had no colour in it.
+// 4 is the default, which is what it should always have been. An earlier
+// version of this comment claimed 3 was "the one that reads as real bounce
+// light" and shipped on 3 anyway, which is why nobody could work out why their
+// scene had no colour in it - ApplySSRT's arithmetic does not agree, since only
+// mode 4 adds the bounce term at all. 3 was avoided because it reprojects into
+// the previous frame, and on a fast turn that reprojection is wrong for a frame
+// or two - coloured smearing across the whole screen, which is worse than having
+// no bounce at all. ApplySSRT now fades the bounce out as the camera moves
+// instead of accepting a reprojection it does not trust, so the smearing is gone
+// and the bounce survives everywhere the camera is still, which is where a person
+// stops to look at a scene.
 //
-// 4 is the default now, which is what it should always have been. It was avoided
-// because it reprojects into the previous frame, and on a fast turn that
-// reprojection is wrong for a frame or two - coloured smearing across the whole
-// screen, which is worse than having no bounce at all. ApplySSRT now fades the
-// bounce out as the camera moves instead of accepting a reprojection it does not
-// trust, so the smearing is gone and the bounce survives everywhere the camera is
-// still, which is where a person stops to look at a scene.
-//
-// The voxel flood fill (LPV) is what would give a lamp behind blue glass a blue
-// room: it multiplies light by each block's tint as it travels. It now compiles
-// on this engine, after five separate things were wrong - see PATHTRACER.md.
-// None of it has been run in game yet, so LPV_ENABLED is still off by default;
-// your saved settings already have it on.
-//
-// If the frame rate suffers, this and RAY_COUNT are the first two things to turn
-// down.
+// If the frame rate suffers, RAY_COUNT and STEPS are the first two things to
+// turn down, and indirect_effect 2 the first switch.
 #define indirect_effect 4 // [0 1 2 3 4]
 
 #define AO_in_sunlight
 #define AO_Strength 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0]
 
-// #define SKY_CONTRIBUTION_IN_SSRT
-
 #define UseQuarterResDepth
 // HQ_SSGI trades RT_alternate's 10-step march for rayTrace_GI's 50-step one, and
 // reads a quarter-resolution depth buffer while doing it. Sharper on distant
-// bounce, roughly five times the cost per ray. Left off for a 3050; it is the
-// first thing to switch on if you have the headroom.
- // #define HQ_SSGI
+// bounce, roughly five times the cost per ray. On by default because the pack
+// already assumes RAY_COUNT 12 and STEPS 28, which cost more than this does;
+// if you are turning those down for frame rate, this belongs on the same list.
+#define HQ_SSGI
 
 // Each GI ray that escapes into the sky should return the sky's own light, or a
 // shadowed surface can only ever pick up bounce from geometry and stays dead
@@ -179,14 +184,17 @@
 // 1.0 reads as though every surface were a white card. The list used to start at
 // 1.0, which meant this could not be turned down at all - only up.
 #define GI_Strength 0.5 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.2 1.5 2.0 2.5 3.0 ]
-// Rays per pixel for the screen-space GI march. Raised from 4 because TAA is
-// enabled above, and TAA accumulates across frames - so the noise from a higher
-// count is resolved over a few frames rather than being visible as grain. Each
-// ray is 10 steps against the depth buffer, so this is the dominant cost of
-// indirect_effect 3 and the first thing to turn down if the frame rate suffers.
-#define RAY_COUNT 8 // [1 2 3 4 5 6 7 8 9 10 12 14 16 18 21 24 28 32 37 43 49 57 65 75 86 100]
-#define STEPS 8	//  [6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99]
-#define STEP_LENGTH 12.	//  [4.  5.  6.  7.  8.  9. 10. 11. 12. 13. 14. 15. 16. 17. 18. 19. 20. 21. 22. 23. 24. 25. 26. 27. 28. 29. 30.]
+// The three numbers that set how much work the screen-space GI march does, and
+// they are one decision: RAY_COUNT rays per pixel, each marching STEPS times
+// against the depth buffer with a stride of STEP_LENGTH. The product is the
+// cost, so a preset that turns one down should turn all three down together.
+//
+// The defaults are high because TAA is on, and TAA accumulates across frames -
+// so the noise a high count produces is resolved over a few frames rather than
+// being visible as grain. Without TAA to average it, 12 x 28 is noise.
+#define RAY_COUNT 12 // [1 2 3 4 5 6 7 8 9 10 12 14 16 18 21 24 28 32 37 43 49 57 65 75 86 100]
+#define STEPS 28	//  [6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99]
+#define STEP_LENGTH 21.	//  [4.  5.  6.  7.  8.  9. 10. 11. 12. 13. 14. 15. 16. 17. 18. 19. 20. 21. 22. 23. 24. 25. 26. 27. 28. 29. 30.]
 
 
 #define SEPARATE_AO
@@ -231,7 +239,12 @@ const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.
 #define Stochastic_Transparent_Shadows
 
 #define Glass_Tint
-// #define TRANSLUCENT_COLORED_SHADOWS
+// Shadows cast through coloured blocks take the block's colour. Without it a
+// stained glass window throws a grey shadow, and the shadow is the only place
+// the colour of the light is visible at all - a torch behind blue glass looks
+// identical whether the glass is there or not. It costs three extra shadow
+// samplers and a separate filtered read per lookup.
+#define TRANSLUCENT_COLORED_SHADOWS
 #ifdef TRANSLUCENT_COLORED_SHADOWS
 	#undef Stochastic_Transparent_Shadows
 #endif
@@ -449,7 +462,7 @@ const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.
 #define MAX_ITERATIONS 35 // [5 10 15 20 25 30 40 50 60 70 80 90 100 125 150 200 400]
 #define MAX_DIST 25.0 // [5.0 10.0 15.0 20.0 25.0 30.0 40.0 50.0 60.0 70.0 80.0 90.0 100.0 125.0 150.0 200.0 400.0]
 
-#define SSS_TYPE 1 // [0 1 2 3]
+#define SSS_TYPE 2 // [0 1 2 3]
 #define LabSSS_Curve 1.0 // [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]
 // #define MOB_SSS
 // #define MISC_BLOCK_SSS
@@ -682,7 +695,12 @@ uniform int moonPhase;
 
 #define TAA
 // #define SCREENSHOT_MODE
-// #define TAA_UPSCALING
+// Rendering below native and resolving with TAA. On by default, and set to 1.0
+// - native, no downscale - because the pack's other settings already assume a
+// machine that does not need the saving. SCALE_FACTOR is where a preset buys
+// frame rate back, not this switch: turning upscaling off with the scale still
+// at 1.0 only costs you the TAA resolve's noise reduction.
+#define TAA_UPSCALING
 #define BLEND_FACTOR 0.12 // [0.01 0.02 0.03 0.04 0.05 0.06 0.08 0.1 0.12 0.14 0.16 0.18 0.20 0.30 0.40 0.50 0.60 0.70 0.80 0.90 1.00]
 #define CLOSEST_VELOCITY
 //#define NO_CLIP
@@ -722,27 +740,38 @@ const float aperture = focal/fstop;
 #define SATURATION 0.00 // [-1.0 -0.98 -0.96 -0.94 -0.92 -0.9 -0.88 -0.86 -0.84 -0.82 -0.8 -0.78 -0.76 -0.74 -0.72 -0.7 -0.68 -0.66 -0.64 -0.62 -0.6 -0.58 -0.56 -0.54 -0.52 -0.5 -0.48 -0.46 -0.44 -0.42 -0.4 -0.38 -0.36 -0.34 -0.32 -0.3 -0.28 -0.26 -0.24 -0.22 -0.2 -0.18 -0.16 -0.14 -0.12 -0.1 -0.08 -0.06 -0.04 -0.02 0.0 0.02 0.04 0.06 0.08 0.1 0.12 0.14 0.16 0.18 0.2 0.22 0.24 0.26 0.28 0.3 0.32 0.34 0.36 0.38 0.4 0.42 0.44 0.46 0.48 0.5 0.52 0.54 0.56 0.58 0.6 0.62 0.64 0.66 0.68 0.7 0.72 0.74 0.76 0.78 0.8 0.82 0.84 0.86 0.88 0.9 0.92 0.94 0.96 0.98 1.0 ]=
 #define CROSSTALK 0.0 // [-1.0 -0.98 -0.96 -0.94 -0.92 -0.9 -0.88 -0.86 -0.84 -0.82 -0.8 -0.78 -0.76 -0.74 -0.72 -0.7 -0.68 -0.66 -0.64 -0.62 -0.6 -0.58 -0.56 -0.54 -0.52 -0.5 -0.48 -0.46 -0.44 -0.42 -0.4 -0.38 -0.36 -0.34 -0.32 -0.3 -0.28 -0.26 -0.24 -0.22 -0.2 -0.18 -0.16 -0.14 -0.12 -0.1 -0.08 -0.06 -0.04 -0.02 0.0 0.02 0.04 0.06 0.08 0.1 0.12 0.14 0.16 0.18 0.2 0.22 0.24 0.26 0.28 0.3 0.32 0.34 0.36 0.38 0.4 0.42 0.44 0.46 0.48 0.5 0.52 0.54 0.56 0.58 0.6 0.62 0.64 0.66 0.68 0.7 0.72 0.74 0.76 0.78 0.8 0.82 0.84 0.86 0.88 0.9 0.92 0.94 0.96 0.98 1.0 ]
 
-// #define LUMINANCE_CURVE
+// A filmic contrast curve on the luminance, before any colour grading. The two
+// are separate because they answer different questions: this one is "should the
+// image have more contrast", the grade below is "should the shadows be warmer".
+#define LUMINANCE_CURVE
 #define UPPER_CURVE 0.0 // [-2.0 -1.9 -1.8 -1.7 -1.6 -1.5 -1.4 -1.3 -1.2 -1.1 -1.0 -0.9 -0.8 -0.7 -0.6 -0.5 -0.4 -0.3 -0.2 -0.1 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define LOWER_CURVE 0.0 // [-2.0 -1.9 -1.8 -1.7 -1.6 -1.5 -1.4 -1.3 -1.2 -1.1 -1.0 -0.9 -0.8 -0.7 -0.6 -0.5 -0.4 -0.3 -0.2 -0.1 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 
-// #define COLOR_GRADING_ENABLED
+// Three-way colour grading: a tint and a multiplier for shadows, mids and
+// highlights, applied separately so a scene can be cooled in shadow and warmed
+// in the highlights at the same time. The _MUL values are the strengths; the
+// RGB triples are the directions. All three MULs at 1.0 and all nine channel
+// values at 1.0 is a grade that does nothing, so the default below is a mild
+// one: shadows pulled down and slightly warm, highlights lifted and slightly
+// cool, mids left alone. It is the difference between a flat image and one with
+// a time of day to it, and it costs nothing at runtime.
+#define COLOR_GRADING_ENABLED
 #define SHADOWS_GRADE_R 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define SHADOWS_GRADE_G 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define SHADOWS_GRADE_B 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
-#define SHADOWS_GRADE_MUL 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
+#define SHADOWS_GRADE_MUL 0.8 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 const vec3 SHADOWS_TARGET = length(vec3(SHADOWS_GRADE_R, SHADOWS_GRADE_G, SHADOWS_GRADE_B)) < 0.001 ? vec3(0.0) : normalize(vec3(SHADOWS_GRADE_R, SHADOWS_GRADE_G, SHADOWS_GRADE_B));
 
 #define MIDS_GRADE_R 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define MIDS_GRADE_G 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define MIDS_GRADE_B 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
-#define MIDS_GRADE_MUL 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
+#define MIDS_GRADE_MUL 0.9 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 const vec3 MIDS_TARGET = length(vec3(MIDS_GRADE_R, MIDS_GRADE_G, MIDS_GRADE_B)) < 0.001 ? vec3(0.0) : normalize(vec3(MIDS_GRADE_R, MIDS_GRADE_G, MIDS_GRADE_B));
 
 #define HIGHLIGHTS_GRADE_R 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define HIGHLIGHTS_GRADE_G 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 #define HIGHLIGHTS_GRADE_B 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
-#define HIGHLIGHTS_GRADE_MUL 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
+#define HIGHLIGHTS_GRADE_MUL 1.1 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0]
 const vec3 HIGHLIGHTS_TARGET = length(vec3(HIGHLIGHTS_GRADE_R, HIGHLIGHTS_GRADE_G, HIGHLIGHTS_GRADE_B)) < 0.001 ? vec3(0.0) : normalize(vec3(HIGHLIGHTS_GRADE_R, HIGHLIGHTS_GRADE_G, HIGHLIGHTS_GRADE_B));
 
 
@@ -852,8 +881,12 @@ const vec3 aerochrome_color = mix(vec3(1.0, 0.0, 0.0), vec3(0.715, 0.303, 0.631)
 
 #define RESOURCEPACK_SKY 0 // [0 1 2 3]
 
+// Entities drawn into a second translucent pass so they can be sorted against
+// each other. Needs a draw the shader pack does not otherwise get - Iris only -
+// so it stays behind IS_IRIS: on OptiFine the define below never reaches a
+// shader and the rest of the pack does not care.
 #ifdef IS_IRIS
-	// #define TRANSLUCENT_ENTITIES
+	#define TRANSLUCENT_ENTITIES
 #endif
 
 #define WATER_CAUSTICS_BRIGHTNESS 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0]
@@ -870,7 +903,12 @@ const vec3 aerochrome_color = mix(vec3(1.0, 0.0, 0.0), vec3(0.715, 0.303, 0.631)
 // #define OLD_BLOOM
 // #define BLOOMY_PARTICLES
 // #define ORIGINAL_CHOCAPIC_SKY
-// #define LARGE_WAVE_DISPLACEMENT
+// A second, much larger wave train on top of the ambient one, so the water has
+// a slow swell and a chop at the same time. The cost is that the two interfere,
+// and a big one close to a small one beats against itself - visible as patches
+// of flat water that drift. GRASS-free water at a distance is where it shows
+// most, since there is nothing else in frame to hide it.
+#define LARGE_WAVE_DISPLACEMENT
 
 #define SELECT_BOX
 #define SELECT_BOX_COL_R 0.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
@@ -911,20 +949,47 @@ const vec3 aerochrome_color = mix(vec3(1.0, 0.0, 0.0), vec3(0.715, 0.303, 0.631)
 // ----- FLOODFILL [LPV] SETTINGS ----- //
 ///////////////////////////////////////////
 
-//#define LPV_ENABLED
-#define LPV_SIZE 7 // [6 7 8]
+// The voxel flood fill: a light volume that is actually filled with light rather
+// than approximated from a screen-space buffer, so it reaches around corners and
+// through a doorway and is not limited to what is on screen. It is what gives a
+// lamp behind blue glass a blue room - light is multiplied by each block's tint
+// as it travels, which nothing else in the pack does.
+//
+// It took five separate things being wrong before it compiled on this engine;
+// they are written up in PATHTRACER.md, and the short version is that the
+// original read the per-block table out of a 1D storage image, which this engine
+// cannot bind.
+//
+// LPV_SIZE is the cost, and it is a steep one: 8 is a 256-cubed volume, 64 times
+// the voxels of 4 would be. It is also the range - the volume is centred on the
+// player, so a size 8 volume reaches 128 blocks and a size 6 one reaches 64.
+// Beyond the edge of the volume the pack falls back to vanilla lighting, so
+// dropping the size shows up as a wall of changed lighting that moves with you.
+#define LPV_ENABLED
+#define LPV_SIZE 8 // [6 7 8]
 #define LPV_SATURATION 100 // [0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200]
 #define LPV_TINT_SATURATION 100 // [0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200]
 #define LPV_NORMAL_STRENGTH 50 // [0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100]
 #define LPV_NORMAL_OFFSET
 #define LPV_ENTITY_LIGHTS
 #define LPV_REDSTONE_LIGHTS
-//#define LPV_COLORED_CANDLES
-//#define LPV_VL_FOG_ILLUMINATION
+// Coloured light sources keep their block colour in the volume, so a torch is
+// orange on the wall it lights rather than a white blob. Only reads correctly
+// for the block ids lpv_blocks.glsl has entries for; anything else falls back to
+// the table's default, which is why it is a switch.
+#define LPV_COLORED_CANDLES
+// The volume also lights the volumetric fog, so a torch under a ceiling throws a
+// visible cone of glow in the air rather than only on the surfaces. This is the
+// single most expensive thing in the pack after the GI march: it moves work from
+// the lighting pass into the fog march, which runs per pixel.
+#define LPV_VL_FOG_ILLUMINATION
 #define LPV_VL_FOG_ILLUMINATION_BRIGHTNESS 100 // [0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100 105 110 115 120 125 130 135 140 145 150 155 160 165 170 175 180 185 190 195 200]]
 
-// Fix for making nether/end work until next Iris release to fix shadow matrices
-//#define LPV_NOSHADOW_HACK
+// The volume is built in the shadow pass, and the shadow matrices for the nether
+// and the end are not what the loader thinks they are until a later Iris. The
+// symptom without this is a volume full of light in the wrong place, so it stays
+// on rather than being left as a workaround someone remembers to apply.
+#define LPV_NOSHADOW_HACK
 
 #ifdef LPV_ENABLED
 	#ifdef IRIS_FEATURE_CUSTOM_IMAGES
