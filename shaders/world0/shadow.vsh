@@ -276,7 +276,33 @@ void main() {
 	#endif
  	
 
-	if (blockId == BLOCK_WATER) gl_Position.w = -1.0;
+	// Water is excluded from the shadow map by pushing it outside clip space.
+	// This has to be a test against the stage, not just against blockId, because
+	// blockId comes from mc_Entity.x and the entity mesh carries no mc_Entity - the
+	// engine answers it with a constant (it logs exactly this: "The entity mesh
+	// carries none of these, so they are answered with a constant and what this
+	// program computes from them is wrong: [mc_Entity]"). So on the entity path
+	// blockId is whatever that constant is, for every vertex, whatever is drawn.
+	//
+	// When that constant happens to be BLOCK_WATER, every vertex of the player gets
+	// gl_Position.w = -1.0, which puts the whole silhouette outside clip space and
+	// clips it away. The shadow map then contains terrain and no player, which is
+	// why walking past a light produced no shadow at all rather than a faint one.
+	//
+	// renderStage is what distinguishes the two cases: TERRAIN_SOLID is 8 and
+	// TERRAIN_TRANSLUCENT is 17 in the engine's own enum (dev/vitrail/pack/model/
+	// RenderStage, which is not Iris's order), so the water test only runs where
+	// mc_Entity actually carries a block id.
+	#if defined IS_LPV_ENABLED || defined RENDER_ENTITY_SHADOWS
+		#extension GL_ARB_explicit_attrib_location : enable
+	#endif
+
+	if (blockId == BLOCK_WATER
+		&& (renderStage == MC_RENDER_STAGE_TERRAIN_SOLID
+		    || renderStage == MC_RENDER_STAGE_TERRAIN_TRANSLUCENT
+		    || renderStage == MC_RENDER_STAGE_TERRAIN_CUTOUT
+		    || renderStage == MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED))
+		gl_Position.w = -1.0;
 
   	gl_Position.z /= 6.0;
 }
