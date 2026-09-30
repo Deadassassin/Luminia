@@ -295,7 +295,22 @@ const float shadowDistance = 128.0; // [32.0 48.0 64.0 80.0 96.0 112.0 128.0 144
 	#define OPTIMIZED_SHADOW_DISTANCE 1 // [-1 1]
 	const float shadowDistanceRenderMul = float(OPTIMIZED_SHADOW_DISTANCE);
 #endif
-const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.75 1.00]
+// Was `const float entityShadowDistanceMul = 0.25;`, which is the one place in
+// this pack that declares an option as a const rather than a #define - and there
+// are only two such options out of several hundred.
+//
+// The engine's profile and options system rewrites a #define line in place. It
+// cannot rewrite a const, so a value saved for this option had no effect on the
+// shader: the const won. That is why setting it to 1.00 in the options file
+// changed nothing. Converted to a #define so the engine can apply it, and so it
+// is consistent with shadowDistance, BLOOM_STRENGTH, Roughness_Threshold and the
+// rest.
+//
+// The value 1.00 means entities are drawn into the shadow map across the full
+// shadowDistance rather than a quarter of it. At 0.25 an entity had to be within
+// 32 of 128 blocks to cast at all, and was crammed into that fraction of the
+// shadow map's resolution while doing it.
+#define entityShadowDistanceMul 1.00 // [0.01 0.02 0.03 0.04 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.75 1.00]
 
 
 #define RENDER_ENTITY_SHADOWS
@@ -384,7 +399,7 @@ const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.
 //
 // These two are the veil. Everything else in the pack can stay as it is.
 #define BLOOMY_FOG 0.25 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0 3.0 4.0 6.0 10.0 15.0 20.0]
-#define BLOOM_STRENGTH  0.25 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 15.0 20.0 25.0 50.0 75.0 100.0]
+#define BLOOM_STRENGTH  0.75 // [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0 15.0 20.0 25.0 50.0 75.0 100.0]
 
 #define CAVE_FOG
 #ifdef CAVE_FOG
@@ -489,7 +504,7 @@ const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.
 #define Dynamic_SSR_quality
 #define Sun_specular_Strength 1 // [0 1 2 3 4 5 6 7 8 9 10]
 #define reflection_quality 30 // [6.0 7.0 8.0 9.0 10.0 11.0 12.0 13.0 14.0 15.0 16.0 17.0 18.0 19.0 20.0 25.0 30.0 35.0 40.0 45.0 50.0 55.0 60.0 65.0 70.0 75.0 80.0 85.0 90.0 95.0 100.0 ]
-#define Roughness_Threshold 1.5 // [1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]
+#define Roughness_Threshold 1.2 // [1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]
 
 #ifdef Specular_Reflections
 	#define LIGHTSOURCE_REFLECTION
