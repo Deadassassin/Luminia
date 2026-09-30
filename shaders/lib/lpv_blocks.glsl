@@ -99,16 +99,19 @@ uvec2 ptBlockLightData(int blockId) {
             vec3 lightColor = vec3(0.0);
             float lightRange = 0.0;
             float mixWeight = 0.0;
-            // Only meaningful for the blocks below that are shaped like something
-            // other than a cube - the stairs, the wall runs, the lamps. Those assign
-            // a real mask and this default is overwritten.
+            // Closed unless a block below opts back into passing light.
             //
-            // It is deliberately NOT consulted for solidity. shadowcomp.csh's
-            // sampleShared decides "does light pass through this voxel" from whether
-            // the block is empty, and asks the table only for the shape of blocks
-            // that are not cubes. Reading this default as a pass-through bit is what
-            // made every wall in the world transparent to light.
-            uint mixMask = 0xFFFF;
+            // shadowcomp.csh reads this value to decide whether light crosses into a
+            // voxel, so it has to be the right answer for every block in the game and
+            // not only for the ones this table names. It was 0xFFFF - open on all six
+            // faces - which meant every solid block that is not special-cased here,
+            // which is nearly all of them, was transparent to the flood fill and
+            // light went straight through the walls.
+            //
+            // 0x0000 is closed on all six. Blocks that genuinely pass light are named
+            // explicitly further down: water, the seventeen glass ids, ice, the
+            // plants, and anything that emits light.
+            uint mixMask = 0x0000;
             vec3 tintColor = vec3(1.0);
 
             if (blockId == BLOCK_SSS_WEAK || blockId == BLOCK_SSS_WEAK_3 || blockId == BLOCK_SSS_STRONG) {
