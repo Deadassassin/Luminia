@@ -185,6 +185,29 @@ vec3 toScreenSpace(vec3 p) {
 	#include "/lib/lpv_render.glsl"
 #endif
 
+// nightVision for the overworld path. diffuse_lighting.glsl reads it at the end
+// of doIndirectLighting, and the two declarations above cover only NETHER_SHADER
+// and END_SHADER - mutually exclusive #ifdefs, not duplicates - so the ordinary
+// path reached that read with nothing declaring it. It went unnoticed because
+// every other unit reaching diffuse_lighting had climate_settings in scope
+// already, and a missing uniform is not an error in the units that do.
+//
+// Not a bare `#include "/lib/climate_settings.glsl"`, because this pass also
+// declares nightVision itself for NETHER and END, and this engine treats a second
+// declaration of the same uniform as a redefinition rather than merging them -
+// which is exactly what declaring it inside diffuse_lighting.glsl did, breaking
+// the 32 units that already had it in scope. climate_settings.glsl is now
+// include-guarded, so guarding this include the same way is enough.
+// This pass declares nightVision itself for NETHER_SHADER and END_SHADER, above,
+// and this engine treats a second declaration as a redefinition rather than
+// merging them. So the include is for the one case that has neither, and the test
+// is for the absence of both - not for OVERWORLD_SHADER, which world1 and world-1
+// do not define, so testing for it let the include through where the collision
+// already was.
+#if !defined NETHER_SHADER && !defined END_SHADER
+#include "/lib/climate_settings.glsl"
+#endif
+
 #include "/lib/diffuse_lighting.glsl"
 
 float ld(float dist) {

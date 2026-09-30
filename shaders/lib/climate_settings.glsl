@@ -1,3 +1,13 @@
+// Include guard.
+//
+// Two units reach this header by different routes - composite2.fsh gets it
+// through lib/volumetricClouds.glsl, composite1.fsh includes it directly for
+// nightVision - and this engine treats a second declaration of the same uniform
+// as a redefinition rather than merging the two. So a unit that arrives by
+// both routes has to compile it once.
+#ifndef INCLUDE_CLIMATE_SETTINGS
+#define INCLUDE_CLIMATE_SETTINGS
+
 // this file contains all things for seasons, weather, and biome specific settings.
 // i gotta start centralizing shit someday. 
 
@@ -233,3 +243,5 @@
 		Cloudy *= Morning*CloudyDensity.r + Noon*CloudyDensity.g + Evening*CloudyDensity.b + Night*CloudyDensity.a;
 	}
 #endif
+
+#endif // INCLUDE_CLIMATE_SETTINGS

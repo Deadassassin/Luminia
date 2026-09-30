@@ -453,10 +453,39 @@ const float entityShadowDistanceMul = 0.25; // [0.01 0.02 0.03 0.04 0.05 0.10 0.
 // ----- LABPBR MATERIALS RELATED SETTINGS ----- //
 ///////////////////////////////////////////////////
 
-// #define Specular_Reflections
-// #define Screen_Space_Reflections
-// #define Sky_reflection
-// #define Rough_reflections
+// The master switch for the whole reflection path. composite1.fsh:1296 only calls
+// DoSpecularReflections - the function everything in lib/specular.glsl exists to
+// serve - inside `#ifdef Specular_Reflections`. With it off, Sky_reflection and
+// Screen_Space_Reflections were dead branches: enabling them changed nothing,
+// because nothing called the code that reads them.
+//
+// It is commented out here, which is the whole reason a glossy block reflected
+// nothing. SpecularTex.r and .g reach it as arguments - .r is the material's
+// specular strength, .g the roughness - so the routine still needs the specular
+// texture to be filled to do anything visible on a dry block. See the note on the
+// specular resource pack below.
+#define Specular_Reflections
+
+// Screen-space reflections: what the first of the two reference screenshots shows -
+// the pillars, the ceiling and the coloured panels all mirrored in a wet floor.
+// lib/specular.glsl:259 ray-marches colortex5 for the reflection direction, and
+// lerps the hit over the background by fresnel. Off meant no mirrored geometry at
+// all, which is why a glossy floor reflected nothing.
+#define Screen_Space_Reflections
+
+// Sky reflection: the fallback radiance when the screen-space ray misses, so a
+// reflection that leaves the screen fades into sky rather than into black. lib/
+// specular.glsl:250. It is an alternative to SSR, not an addition - each produces
+// the same thing, so running both would light every reflective surface twice and
+// wash the image out, which is why SSR masks it via SS_Reflections.a.
+#define Sky_reflection
+
+// Rough reflections: sample the gloss lobe with a GGX/VNDF distribution instead of
+// a perfect mirror. Without it lib/specular.glsl:216 uses SamplePoints =
+// vec3(0,0,1) for every reflective surface, so a rough block and polished glass
+// reflect identically and a whole room looks like a mirror.
+#define Rough_reflections
+
 #define Dynamic_SSR_quality
 #define Sun_specular_Strength 1 // [0 1 2 3 4 5 6 7 8 9 10]
 #define reflection_quality 30 // [6.0 7.0 8.0 9.0 10.0 11.0 12.0 13.0 14.0 15.0 16.0 17.0 18.0 19.0 20.0 25.0 30.0 35.0 40.0 45.0 50.0 55.0 60.0 65.0 70.0 75.0 80.0 85.0 90.0 95.0 100.0 ]
