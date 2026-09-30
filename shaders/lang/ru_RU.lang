@@ -1,5 +1,5 @@
-profile.SHADER_VERSION_LABEL = Bliss v2.1.1
-profile.OLD_BLISS_TONEMAP = Bliss v2.1.1 + v2.0.4 Color Processing
+profile.SHADER_VERSION_LABEL = Lumina
+profile.LEGACY_TONEMAP = Hejl 2015 (старая обработка цвета)
 
 # Эти настройки не делают то, что заявлено
 profile.QUALITY=Качество

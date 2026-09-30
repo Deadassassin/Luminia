@@ -1,4 +1,4 @@
-option.SHADER_VERSION_LABEL = Bliss In-Dev Commit Number
+profile.SHADER_VERSION_LABEL = Lumina
 
 screen.Misc_Settings = Configurações Diversas
      screen.the_orb = O Orb
