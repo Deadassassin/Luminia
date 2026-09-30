@@ -99,11 +99,60 @@ uvec2 ptBlockLightData(int blockId) {
             vec3 lightColor = vec3(0.0);
             float lightRange = 0.0;
             float mixWeight = 0.0;
+            // Only meaningful for the blocks below that are shaped like something
+            // other than a cube - the stairs, the wall runs, the lamps. Those assign
+            // a real mask and this default is overwritten.
+            //
+            // It is deliberately NOT consulted for solidity. shadowcomp.csh's
+            // sampleShared decides "does light pass through this voxel" from whether
+            // the block is empty, and asks the table only for the shape of blocks
+            // that are not cubes. Reading this default as a pass-through bit is what
+            // made every wall in the world transparent to light.
             uint mixMask = 0xFFFF;
             vec3 tintColor = vec3(1.0);
 
             if (blockId == BLOCK_SSS_WEAK || blockId == BLOCK_SSS_WEAK_3 || blockId == BLOCK_SSS_STRONG) {
                 mixWeight = 1.0;
+            }
+
+            // The blocks that genuinely pass light, opting in explicitly.
+            //
+            // These set mixWeight but never set mixMask, so under the old code they
+            // relied on the 0xFFFF default being read as "open". Now that a solid
+            // voxel is closed without consulting the table, anything not listed here
+            // is closed - which would put out glass, water and every plant in the
+            // game. So they are named.
+            //
+            // The mask chosen per block is the shape, not a blanket pass:
+            //
+            //   - water is open on the top face only, so light falls in and pools
+            //     rather than travelling sideways through an ocean
+            //   - glass, ice and the seventeen glass colours are open on all six,
+            //     because a glass-walled room should be lit
+            //   - plants are open, since the voxel a plant occupies is the one light
+            //     has to pass through on its way out of the block it grows on
+            //
+            // Emitters need this too - a torch seeds its own voxel and the light has
+            // to leave it - but they are keyed off lightRange further down rather
+            // than listed here, so that a new emitter added to the table cannot be
+            // forgotten.
+            if (blockId == BLOCK_WATER) {
+                mixMask = BuildLpvMask(0u, 0u, 0u, 0u, 1u, 0u);
+            }
+            else if (blockId >= BLOCK_GLASS && blockId <= BLOCK_GLASS_YELLOW) {
+                // The seventeen glass ids are contiguous, 301 through 317.
+                mixMask = BuildLpvMask(1u, 1u, 1u, 1u, 1u, 1u);
+            }
+            else if (blockId == BLOCK_ICE) {
+                mixMask = BuildLpvMask(1u, 1u, 1u, 1u, 1u, 1u);
+            }
+            else if (blockId == BLOCK_AIR_WAVING
+                  || blockId == BLOCK_GROUND_WAVING || blockId == BLOCK_GROUND_WAVING_VERTICAL
+                  || blockId == BLOCK_BAMBOO || blockId == BLOCK_SAPLING
+                  || blockId == BLOCK_GRASS_SHORT || blockId == BLOCK_GRASS_TALL_UPPER
+                  || blockId == BLOCK_GRASS_TALL_LOWER || blockId == BLOCK_SSS_WEAK
+                  || blockId == BLOCK_SSS_WEAK_3 || blockId == BLOCK_SSS_STRONG) {
+                mixMask = BuildLpvMask(1u, 1u, 1u, 1u, 1u, 1u);
             }
 
             switch (blockId) {
@@ -1187,6 +1236,22 @@ uvec2 ptBlockLightData(int blockId) {
 
             // lazy fix for migrating from mixWeight to tintColor
             tintColor *= mixWeight;
+
+            // Anything that emits light must be able to pass it.
+            //
+            // The fill seeds an emitter's own voxel with its light, and that light
+            // then has to leave the voxel to reach anything else. sampleShared asks
+            // the table for the mask, and a torch - like everything else that is not
+            // a cube - would come back closed. So it would light the single voxel it
+            // occupies and nothing else, which looks exactly like a torch that does
+            // not work.
+            //
+            // Keyed off lightRange rather than a list of the seventy-odd emitters,
+            // because they all set a range and a range of zero means the block does
+            // not emit. So this cannot open a block that was meant to stay solid, and
+            // it cannot be forgotten when a new emitter is added to the table above.
+            if (lightRange > 0.0)
+                mixMask = BuildLpvMask(1u, 1u, 1u, 1u, 1u, 1u);
 
             uint lightColorRange = packUnorm4x8(vec4(lightColor, lightRange/255.0));
             uint tintColorMask = packUnorm4x8(vec4(tintColor, 0.0));

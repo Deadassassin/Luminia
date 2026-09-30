@@ -94,8 +94,31 @@ layout (local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
         uint blockId = voxelSharedData[shared_index];
         
         if (blockId > 0 && blockId != BLOCK_EMPTY) {
-            uvec2 blockData = ptBlockLightData(int(blockId));
-            mask = (blockData.g >> 24) & 0xFFFF;
+            // A solid voxel does not pass light, and that is decided here rather
+            // than by consulting the table.
+            //
+            // The table cannot decide it. ptBlockLightData returns mixMask = 0xFFFF
+            // for any block it does not special-case, and it only special-cases the
+            // ones it has something unusual to say about - the ~70 emitters, the
+            // stairs and wall runs with a partial shape, water, glass. Every solid
+            // block in the game falls through to the default, which is open on all
+            // six faces. So reading the mask for a quartz wall returned 0xFFFF,
+            // ((0xFFFF >> mask_index) & 1u) was 1, and light went straight through
+            // it. That is the whole reason nothing cast a shadow: the fill was
+            // passing light through every wall in the world.
+            //
+            // Shrimple gates on emptiness for exactly this reason. Its
+            // sampleDirectShared reads:
+            //
+            //     weight = blockId == BLOCK_EMPTY ? 1.0 : 0.0;
+            //
+            // and its own mixMask also defaults to 0xFFFF - it never uses the mask
+            // to decide solidity either. Emptiness is the gate, full stop.
+            //
+            // So: solid means solid. The mask is only consulted for the blocks whose
+            // shape actually differs from a cube, and ptBlockLightData's default is
+            // ignored for everything else.
+            mask = 0u;
         }
 
         return lpvSharedData[shared_index] * ((mask >> mask_index) & 1u);
