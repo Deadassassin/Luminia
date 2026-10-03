@@ -1,4 +1,4 @@
-# Lumina
+# Luminia v0.5b
 
 An edit of Bliss, which is itself an edit of Chocapic13's shaders.
 <img src="https://github.com/X0nk/Bliss-Shader/assets/122314734/873c788c-5a48-46c0-9fb5-eac57b4ffa27" width="100%" height="100%">
