@@ -1,4 +1,4 @@
-# Luminia
+# Luminia v0.4.2
 
 An edit of Bliss, which is itself an edit of Chocapic13's shaders.
 
@@ -29,4 +29,16 @@ I wanted to emphasize a varying scene, where the lighting isn't always the same 
 ## How to download the `stable` version:
  - Locate the `green "Code" button` on this page (not in the `Releases` page).
  - Click the `green "Code" button` and select `"Download ZIP"`.
+ - Once the zip file finishes downloading, install it like a normal shader. You do NOT need to unzip/extract/decompress.
+
+## How to download the `unstable` version:
+ - Locate the `"branch switcher"` drop-down menu on the top-left area of this page.
+ - Select the `"Unstable"` branch.
+ - After doing the above, locate the `green "Code" button` on this page (not in the `Releases` page).
+ - Click the `green "Code" button` and select `"Download ZIP"`.
+ - Once the zip file finishes downloading, install it like a normal shader. You do NOT need to unzip/extract/decompress.
+
+## How to download the `release` version:
+ - Locate the `"Releases"` tab on the right side of this page.
+ - Find the release version you want to download. Locate the files attached to it, and download the file named similar to `"Luminia_(version)_chocapic13_shaders_edit.zip"`.
  - Once the zip file finishes downloading, install it like a normal shader. You do NOT need to unzip/extract/decompress.
