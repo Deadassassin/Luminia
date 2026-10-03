@@ -522,9 +522,11 @@ const float shadowDistance = 128.0; // [32.0 48.0 64.0 80.0 96.0 112.0 128.0 144
 // nothing that means anything.
 //
 // It only writes roughness and F0. It cannot make a block emit - see the note at
-// the foot of lib/material_reflectance.glsl, and the note on the BLOCK_MAT_ ids at
-// the foot of lib/blocks.glsl for why the 1000+ range cannot reach the emissive
-// range in all_solid.vsh:277 or the light table in lib/lpv_blocks.glsl.
+// the foot of lib/material_reflectance.glsl, and the long note on the BLOCK_MAT_
+// ids at the foot of lib/blocks.glsl for why those ids start at 2000 and not
+// lower. That number is load-bearing: mc_Entity.x is one id space shared with
+// item.properties (1000-1024, all light sources) and entity.properties, so an id
+// placed inside the item band turns the block holding it into a torch.
 #define LUMINA_MATERIAL_REFLECTANCE
 
 #ifdef Specular_Reflections

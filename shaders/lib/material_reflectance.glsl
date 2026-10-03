@@ -98,10 +98,15 @@
 //
 // This file only writes roughness and F0. It cannot make a block emit: emission
 // is EMISSIVE in all_solid.vsh (0.5 for ids in [100, 300), all_solid.vsh:277)
-// and a block's flood-fill light is ptBlockLightData() in lib/lpv_blocks.glsl,
-// and every id this table is keyed on is >= 1000 - see lib/blocks.glsl for why
-// that range is safe on both counts. A reflective block is lit BY the scene; it
-// is not a light source.
+// and a block's flood-fill light is ptBlockLightData() in lib/lpv_blocks.glsl.
+// Every id this table is keyed on is >= 2000, which is clear of both - and of the
+// item id band at 1000-1024, which is the one that actually bites: an earlier
+// version of this table started at 1000 and 23 of its blocks came back as torches,
+// lanterns, beacons and glowstone, which made them emit AND let light pass
+// straight through them. See the note on the BLOCK_MAT_ ids at the foot of
+// lib/blocks.glsl for that in full.
+//
+// A reflective block is lit BY the scene; it is not a light source.
 
 #ifdef LUMINA_MATERIAL_REFLECTANCE
 

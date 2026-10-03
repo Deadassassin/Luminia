@@ -348,26 +348,72 @@ void DoSpecularReflections(
 	//
 	// This is the only reflection path with no hasReflections gate, so in v0.4.2 it
 	// ran on every block in the world - including the ones the gate had just
-	// rejected as matte. That is what made a matte block look lit from within: not
-	// a glow, and not emission (nothing here writes EMISSIVE, and the emissive
-	// range in all_solid.vsh:277 is nowhere near a BLOCK_MAT_ id), but a broad,
-	// dim sheen added to a surface that had been told it reflects nothing.
-	//
+	// rejected as matte. That is what made a matte block look lit from within.
 	// Quartz was the one that made it obvious, because quartz is deliberately not
 	// in lib/material_reflectance.glsl: it scores gate = -0.0033 against the 0.01
 	// cutoff, hasReflections is false, and every other path below is correctly
 	// switched off - while this one carried on regardless.
 	//
 	// Gating it makes the gate mean one thing in one place: a surface reflects or
-	// it does not, and which surfaces those are is decided in one place. It also
-	// fixes the direction of the error. The GGX lobe is steeply sensitive to
-	// roughness - at normal incidence the D*F term is orders of magnitude larger
-	// for a smooth surface than for a rough one - so ungated, the term was
-	// negligible on pale rough blocks and enormous on the metals. That is the
-	// opposite of the intended "a subtle sheen on rough surfaces".
+	// it does not.
 	#ifdef LIGHTSOURCE_REFLECTION
 		if (hasReflections) {
-			Lightsource_Reflection = Diffuse * GGX(Normal, -WorldPos, LightPos, Roughness, F0) * Metals;
+			// GGX() in this file has no geometry term and no 1/(4*NoV), so the factor
+			// that is supposed to cancel D's growth is not there and the result runs
+			// away as roughness falls. Its own floor, r = max(pow(r,2.5), 0.0001),
+			// only holds it to about 1e8, which is nowhere near bounded.
+			//
+			// In v0.4.2 this was harmless, and only by accident: every block sampled
+			// the specular texture at roughness 1.0, where the term evaluates to 0.05
+			// and nobody would ever have noticed. A per-block material table
+			// (lib/material_reflectance.glsl) is the first thing to hand this function
+			// a genuinely smooth surface, and it goes off the scale immediately:
+			//
+			//     roughness 1.00   every block in v0.4.2          5.1e-02
+			//     roughness 0.55   netherrack                       1.0e+00
+			//     roughness 0.09   lapis, emerald                   8.6e+03
+			//     roughness 0.04   iron, copper, iron ore          1.1e+07
+			//     roughness 0.02   gold                             1.2e+08
+			//
+			// and 1e8 is well past what the RGBA16F targets hold (65504), so it clamps
+			// partway through the bloom chain. What survives is a bright halo of
+			// whatever channel ratio the clamp left behind, which is why this reads as
+			// a glow of a colour the block does not have rather than as a highlight.
+			// It is additive, so nothing else in the function gates it.
+			//
+			// 0.035 is not a number picked here: all_translucent.fsh:805 has always
+			// guarded its own GGX call with max(roughness, 0.035) and this path simply
+			// never got the same guard. Using it makes the two agree, which they should
+			// have been from the start.
+			float glintRoughness = max(Roughness, 0.035);
+
+			// The floor above bounds the roughness axis. It does not bound the other
+			// singularity in GGX: as dotLH goes to 0 - the light directly opposite the
+			// view - the denominator falls to k2 = 0.25*r while D rises as 1/r, so the
+			// product still reaches 1e7 on the materials above.
+			//
+			// This is not a flaw in the arithmetic. A punctual light reflected by a
+			// near-mirror genuinely IS a delta function and unbounded, which is why
+			// renderers either clamp it or integrate it over the light's solid angle.
+			// This pack has no light solid angle to integrate over - LightPos is a
+			// direction - so the peak is capped instead.
+			//
+			// Capping at 1.0 and then weighting by RayContribution means the strongest
+			// glint a surface can add is its own Fresnel reflectance times its lit
+			// colour: strong and obvious on a metal (F0 0.906), barely there on a
+			// dielectric (F0 0.04). That is the correct relative answer, and it is the
+			// same RayContribution the sky and screen-space paths above already use, so
+			// all three agree on how reflective a surface is.
+			//
+			// The clamp discards the Schlick term GGX carries internally, and
+			// RayContribution puts a Fresnel weight back on the result - so for a
+			// surface sitting at the cap the total is one Fresnel, not two. Blocks
+			// still under the cap (concrete 0.076, wool 0.003) keep GGX's own value and
+			// pick up a second Schlick factor, which is immaterial because they are
+			// already dim and rough.
+			float glint = min(GGX(Normal, -WorldPos, LightPos, glintRoughness, F0), 1.0);
+
+			Lightsource_Reflection = Diffuse * glint * RayContribution * Metals;
 			Final_Reflection += Lightsource_Reflection * Sun_specular_Strength ;
 		}
 	#endif

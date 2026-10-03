@@ -317,82 +317,119 @@
 // apart from each other.
 //
 // ---------------------------------------------------------------------------
-// WHY 1000 AND ABOVE, AND WHY THAT IS SAFE.
+// WHY 2000 AND ABOVE - AND READ THIS BEFORE MOVING THEM.
 //
-// The previous maximum id was 501 (BLOCK_SIGN), so nothing existing moves.
+// mc_Entity.x is NOT a block-only id space. It carries whatever the thing being
+// drawn is, from all three of these files, into one namespace:
 //
-// A new id cannot make a block emit light, on either of the two paths that could:
+//     block.properties     ids up to   501
+//     item.properties      ids 1000 .. 1024
+//     entity.properties    ids 1601 .. 1803
+//
+// and ptBlockLightData() in lib/lpv_blocks.glsl matches BLOCK_*, ITEM_* and
+// ENTITY_* cases against that single number. That is how it knows a dropped torch
+// is a light source.
+//
+// The first version of this table used 1000 and up, which is straight through the
+// item band. 23 of the 45 ids landed on an item id that ptBlockLightData treats
+// as an emitter:
+//
+//     gold_block    1001 -> ITEM_AMETHYST_BUD_LARGE
+//     lapis_block   1004 -> ITEM_BEACON
+//     redstone_block 1005 -> ITEM_BLAZE_ROD
+//     obsidian      1015 -> ITEM_LANTERN
+//     netherrack    1020 -> ITEM_SEA_LANTERN
+//     budding_amethyst 1024 -> ITEM_TORCH
+//     ... and 17 more
+//
+// So those blocks were not just glowing, they were glowing and TRANSPARENT TO
+// LIGHT: ptBlockLightData gives an emitter a non-zero lightRange, and the line at
+// its foot then does
+//
+//     if (lightRange > 0.0) mixMask = BuildLpvMask(1u,1u,1u,1u,1u,1u);
+//
+// which opens all six faces so the light can escape its own voxel. A redstone
+// block in a wall let the sun straight through it.
+//
+// 2000 is above every id any of the three files uses (the highest is 1803), so
+// there is no band left to fall into. tools/check_material_table.py asserts that
+// against all three files and against the ITEM_*/ENTITY_* macros, so a future
+// change that grows one of them past 2000 fails the check instead of quietly
+// turning a block into a torch.
+//
+// ---------------------------------------------------------------------------
+// WHY A NEW ID HERE CANNOT MAKE A BLOCK EMIT, ONCE THE RANGE IS RIGHT.
 //
 //   * all_solid.vsh:277 marks a block emissive with
 //         if(mc_Entity.x >= 100 && mc_Entity.x < 300) EMISSIVE = 0.5;
-//     Every id here is >= 1000, so it is outside that range by a wide margin.
+//     Every id here is >= 2000, so it is outside that range by a wide margin.
 //
-//   * ptBlockLightData() in lib/lpv_blocks.glsl selects the flood fill's light
-//     with `if (blockId == ...)` and guarded `if (blockId >= A && blockId <= B)`
-//     tests, none of which reach 1000. Its fallthrough defaults are
-//     lightRange 0.0 and mixMask 0x0000, so an id this table introduces is a
-//     block that emits nothing and passes no light - the same answer every other
-//     unlisted block already gets.
+//   * ptBlockLightData() names the blocks that emit. It is written as a chain of
+//     `if (blockId == ...)` and guarded `if (blockId >= A && blockId <= B)` tests
+//     whose largest upper bound is BLOCK_STAIRS_TOP_OUTER_S_W, and its fallthrough
+//     defaults are lightRange 0.0 and mixMask 0x0000 - so an id introduced here is
+//     a block that emits nothing and passes no light, which is the same answer
+//     every other unlisted block already gets.
 //
 // Neither path indexes an array by id, so there is nothing for a large id to run
-// off the end of. Verified by reading both, not assumed.
+// off the end of.
 //
 // ---------------------------------------------------------------------------
 // QUARTZ IS NOT HERE, AND MUST NOT BE ADDED.
 //
-// Quartz and smooth quartz are intentionally absent, which is why 1013 and 1014
+// Quartz and smooth quartz are intentionally absent, which is why 2013 and 2014
 // are unused: block.properties in v0.4.2 contains no entry for quartz_block at
 // all, so it resolved to the shared fallback id and had no material. Giving it an
 // id is what put quartz into the reflective path and made it pick up a highlight
 // it should never have had. It stays unlisted. Nothing in lib/
 // material_reflectance.glsl names it either, so quartz is matte - the same as it
-// was in 0.4.2.
+// was in v0.4.2.
 //
 // Prefixed BLOCK_MAT_ so they cannot collide with the light table's BLOCK_ names,
 // several of which cover different blocks entirely.
-#define BLOCK_MAT_IRON_BLOCK 1000
-#define BLOCK_MAT_GOLD_BLOCK 1001
-#define BLOCK_MAT_DIAMOND_BLOCK 1002
-#define BLOCK_MAT_EMERALD_BLOCK 1003
-#define BLOCK_MAT_LAPIS_BLOCK 1004
-#define BLOCK_MAT_REDSTONE_BLOCK 1005
-#define BLOCK_MAT_COAL_BLOCK 1006
-#define BLOCK_MAT_COPPER_BLOCK 1007
-#define BLOCK_MAT_COPPER_EXPOSED 1008
-#define BLOCK_MAT_COPPER_WEATHERED 1009
-#define BLOCK_MAT_RAW_COPPER_BLOCK 1010
-#define BLOCK_MAT_RAW_GOLD_BLOCK 1011
-#define BLOCK_MAT_RAW_IRON_BLOCK 1012
-// 1013 and 1014 are deliberately unassigned: they were quartz and smooth quartz.
-#define BLOCK_MAT_OBSIDIAN 1015
-#define BLOCK_MAT_CALCITE 1016
-#define BLOCK_MAT_TUFF 1017
-#define BLOCK_MAT_POLISHED 1018
-#define BLOCK_MAT_PURPUR 1019
-#define BLOCK_MAT_NETHERRACK 1020
-#define BLOCK_MAT_MUSHROOM_STEM 1021
-#define BLOCK_MAT_MUD 1022
-#define BLOCK_MAT_HONEYCOMB 1023
-#define BLOCK_MAT_BUDDING_AMETHYST 1024
-#define BLOCK_MAT_AMETHYST 1025
-#define BLOCK_MAT_DEEPSLATE 1026
-#define BLOCK_MAT_PRISMARINE 1027
-#define BLOCK_MAT_SNOW_BLOCK 1028
-#define BLOCK_MAT_BLUE_ICE 1029
-#define BLOCK_MAT_IRON_ORE 1030
-#define BLOCK_MAT_GOLD_ORE 1031
-#define BLOCK_MAT_DIAMOND_ORE 1032
-#define BLOCK_MAT_EMERALD_ORE 1033
-#define BLOCK_MAT_REDSTONE_ORE 1034
-#define BLOCK_MAT_LAPIS_ORE 1035
-#define BLOCK_MAT_COAL_ORE 1036
-#define BLOCK_MAT_ANVIL 1037
-#define BLOCK_MAT_CHAIN 1038
-#define BLOCK_MAT_IRON_BARS 1039
-#define BLOCK_MAT_CONCRETE 1040
-#define BLOCK_MAT_GLAZED_TERRACOTTA 1041
-#define BLOCK_MAT_WOOL 1042
-#define BLOCK_MAT_STAINED_GLASS 1043
-#define BLOCK_MAT_STAINED_GLASS_PANE 1044
-#define BLOCK_MAT_CRYING_OBSIDIAN 1045
-#define BLOCK_MAT_PACKED_ICE 1046
+#define BLOCK_MAT_IRON_BLOCK 2000
+#define BLOCK_MAT_GOLD_BLOCK 2001
+#define BLOCK_MAT_DIAMOND_BLOCK 2002
+#define BLOCK_MAT_EMERALD_BLOCK 2003
+#define BLOCK_MAT_LAPIS_BLOCK 2004
+#define BLOCK_MAT_REDSTONE_BLOCK 2005
+#define BLOCK_MAT_COAL_BLOCK 2006
+#define BLOCK_MAT_COPPER_BLOCK 2007
+#define BLOCK_MAT_COPPER_EXPOSED 2008
+#define BLOCK_MAT_COPPER_WEATHERED 2009
+#define BLOCK_MAT_RAW_COPPER_BLOCK 2010
+#define BLOCK_MAT_RAW_GOLD_BLOCK 2011
+#define BLOCK_MAT_RAW_IRON_BLOCK 2012
+// 2013 and 2014 are deliberately unassigned: they were quartz and smooth quartz.
+#define BLOCK_MAT_OBSIDIAN 2015
+#define BLOCK_MAT_CALCITE 2016
+#define BLOCK_MAT_TUFF 2017
+#define BLOCK_MAT_POLISHED 2018
+#define BLOCK_MAT_PURPUR 2019
+#define BLOCK_MAT_NETHERRACK 2020
+#define BLOCK_MAT_MUSHROOM_STEM 2021
+#define BLOCK_MAT_MUD 2022
+#define BLOCK_MAT_HONEYCOMB 2023
+#define BLOCK_MAT_BUDDING_AMETHYST 2024
+#define BLOCK_MAT_AMETHYST 2025
+#define BLOCK_MAT_DEEPSLATE 2026
+#define BLOCK_MAT_PRISMARINE 2027
+#define BLOCK_MAT_SNOW_BLOCK 2028
+#define BLOCK_MAT_BLUE_ICE 2029
+#define BLOCK_MAT_IRON_ORE 2030
+#define BLOCK_MAT_GOLD_ORE 2031
+#define BLOCK_MAT_DIAMOND_ORE 2032
+#define BLOCK_MAT_EMERALD_ORE 2033
+#define BLOCK_MAT_REDSTONE_ORE 2034
+#define BLOCK_MAT_LAPIS_ORE 2035
+#define BLOCK_MAT_COAL_ORE 2036
+#define BLOCK_MAT_ANVIL 2037
+#define BLOCK_MAT_CHAIN 2038
+#define BLOCK_MAT_IRON_BARS 2039
+#define BLOCK_MAT_CONCRETE 2040
+#define BLOCK_MAT_GLAZED_TERRACOTTA 2041
+#define BLOCK_MAT_WOOL 2042
+#define BLOCK_MAT_STAINED_GLASS 2043
+#define BLOCK_MAT_STAINED_GLASS_PANE 2044
+#define BLOCK_MAT_CRYING_OBSIDIAN 2045
+#define BLOCK_MAT_PACKED_ICE 2046
