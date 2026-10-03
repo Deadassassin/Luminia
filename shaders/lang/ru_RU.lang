@@ -1,4 +1,4 @@
-profile.SHADER_VERSION_LABEL = Lumina
+profile.SHADER_VERSION_LABEL = Luminia
 profile.LEGACY_TONEMAP = Hejl 2015 (старая обработка цвета)
 
 # Эти настройки не делают то, что заявлено
