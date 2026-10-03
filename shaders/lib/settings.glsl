@@ -452,12 +452,121 @@ const float shadowDistance = 128.0; // [32.0 48.0 64.0 80.0 96.0 112.0 128.0 144
 #define SNOW_STORMS
 #define SAND_STORMS
 
+// The nether's biome environment, and the only one in this section that is not
+// per-biome: isNether is 1 for every nether biome, because Iris resolves all of
+// them to the single category CAT_NETHER (there is no CAT_SOUL_SAND_VALLEY and no
+// CAT_CRIMSON_FOREST - only one Nether category exists, at CAT_NETHER 16, alongside
+// CAT_THE_END 8 for the end). Splitting it per biome would mean the `biome`
+// uniform and a BIOME_* constant per biome, for fog that is generated from noise
+// rather than from terrain - so it would tint something that is not really
+// coming from the ground. See tools/check_biome_consts.py, which enforces the
+// constant list against Iris's own BiomeCategories enum.
+#define NETHER_BIOME_ENVIRONMENT
+#define NETHER_STORM_DENSITY 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.25 1.5 1.75 2.0 2.5 3.0 4.0 5.0]
+#define NETHER_STORM_R 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
+#define NETHER_STORM_G 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
+#define NETHER_STORM_B 1.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
+
+// The three above are separate defines so each can be a slider. The shader wants
+// them as one colour, so it reads the three directly rather than through a
+// NETHER_STORM_COLOUR macro.
+//
+// That is not a style preference. settings.glsl is #included by every pass in the
+// pack, including vertex stages and shadow passes, so a macro whose body is a
+// vec3 constructor becomes a top-level statement in each of them - and a
+// `vec3(...)` initializer at file scope is not valid GLSL. It fails as a syntax
+// error in 215 of the 250 programs with only "unexpected IDENTIFIER" to show for
+// it, because the error points at the include and not at the definition.
+//
+// The default (1.0, 1.0, 1.0) is a deliberate no-op: it multiplies into the nether
+// plume lighting and changes nothing. The nether's own (1.0, 0.4, 0.2) stays
+// written into the shader, so setting all three sliders to 1.0 gives a NEUTRAL
+// overcast rather than a doubled-up orange one.
+
+// ---------------------------------------------------------------------------
+// HOW THE STORM UNIFORMS ARE WIRED, AND WHY THERE IS NO RAIN_STORM / NETHER_
+// VARIANT OF IT HERE.
+//
+// Every *_STORM and the nether block above is a plain #define, and the matching
+// uniforms in shaders/shaders.properties are built from them by #ifdef. That is
+// the pack's existing convention and this section follows it.
+//
+// Everything in this section is a plain #define, and shaders.properties selects
+// the matching uniform with #ifdef. Cumulonimbus is the one that needs a little
+// more, because its fade time is not a simple flag - it is arithmetic:
+//
+//     #define CUMULONIMBUS                        <- the toggle
+//     #define CUMULONIMBUS_FADE_TIME_MINUTES 2    <- the slider, in minutes
+//     variable.float.cumulonimbusFadeTime = (CUMULONIMBUS_FADE_TIME_MINUTES * 60.0) + 60.0
+//     uniform.float.cumulonimbusStrength = smooth(if(thunderStrength > 0.0, 1.0, 0.0), 60.0, cumulonimbusFadeTime)
+//
+// The naming is deliberate. The two options are UPPER_CASE so they are options,
+// and the variable is lower case so it is not mistaken for one: writing
+// `variable.float.` in THIS file would inject a bare `variable.` token into the
+// middle of the GLSL stream, which the compiler reports as "unexpected
+// IDENTIFIER" with no line number, in 215 of the 250 programs. All 40 of this
+// pack's variable.* declarations live in shaders.properties, which is also where
+// the one above is.
+//
+// The minutes-to-seconds conversion is inside the expression rather than in the
+// option, because a slider on a uniform cannot carry a unit - so the label
+// carries it instead.
+
+// Deserts, mesas and savannas. Added because the only desert weather that existed
+// was SAND_STORMS, and that one is driven by thunderStrength - so a desert under
+// ordinary rain got no desert fog at all, and any desert-flavoured biome that was
+// not in in(biome, 5, 26, 27, 28) got nothing ever. Detection is now by
+// biome_category, so Biomes O' Plenty deserts are included.
+//
+// The defaults are a hot, hazy, sand-coloured fog: strong on red, low on blue,
+// which is what blowing dust does to the light. Deliberately faint on density,
+// because desert air is clear - the effect should come from colour, not soup.
+#define DESERT_ENV
+#define DESERT_UNIFORM_DENSITY 0.05 // [0.0 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
+#define DESERT_CLOUDY_DENSITY 0.05 // [0.0 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.15 0.2 0.25 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
+#define DESERT_R 0.9 // [0.00 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0]
+#define DESERT_G 0.75 // [0.00 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0]
+#define DESERT_B 0.5 // [0.00 0.05 0.1 0.15 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.55 0.6 0.65 0.7 0.75 0.8 0.85 0.9 0.95 1.0]
+
+// RAIN_STORMS is the third of the set and was the missing one. snowStorm and
+// sandStorm both existed, so rain had no storm of its own: heavy rain in a
+// temperate biome rendered as ordinary rain. It keys off the precipitation the
+// biome actually reports, so a snow biome is a snowStorm and not a rainStorm -
+// see the note in shaders/shaders.properties.
+#define RAIN_STORMS
+
+// Eclipse's storm cloud gate. While thunder is active the cloud profile collapses
+// toward a cumulonimbus shape, so a thunderstorm reads as weather rather than as
+// slightly denser cumulus. Ported from Eclipse's lib/volumetricClouds.glsl.
+//
+// Unlike everything else in this section it changes the cloud SILHOUETTE rather
+// than tinting it, so it is the option most worth turning off if the storm sky
+// looks wrong - which is why it has its own fade-time slider to adjust rather
+// than a set of colour swatches.
+#define CUMULONIMBUS
+// How long the storm sky takes to clear after the thunder stops, in MINUTES, and
+// on the settings screen beside the toggle.
+//
+// It is an option like every other one here, and the conversion to the seconds
+// smooth() wants happens inside the expression in shaders.properties rather than
+// here - because an option's value is the literal after the #define, and putting
+// arithmetic in that literal is not something a slider can drive.
+#define CUMULONIMBUS_FADE_TIME_MINUTES 2 // [0 1 2 3 4 5 6 8 10 15 20 30 45 60]
+
 // i have to do this so it shows up in the menu lmao
 #ifdef SWAMP_ENV
 #endif
 #ifdef JUNGLE_ENV
 #endif
 #ifdef DARKFOREST_ENV
+#endif
+#ifdef DESERT_ENV
+#endif
+#ifdef NETHER_BIOME_ENVIRONMENT
+#endif
+#ifdef RAIN_STORMS
+#endif
+#ifdef CUMULONIMBUS
 #endif
 #ifdef SNOW_STORMS
 #endif

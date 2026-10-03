@@ -27,7 +27,7 @@ float cloudVol(in vec3 pos, float maxDistance ){
 	
 	float fog_shape = 0.0;
 	float fog_erosion = 0.0;
-	if(sandStorm < 1.0 && snowStorm < 1.0){
+	if(sandStorm < 1.0 && snowStorm < 1.0 && rainStorm < 1.0){
 		fog_shape = 1.0 - densityAtPosFog(samplePos * 24.0);
 		fog_erosion = 1.0 - densityAtPosFog(samplePos2 * 200.0 - vec3(min(max(fog_shape - 0.6 ,0.0) * 2.0 ,1.0)*200.0));
 	}
@@ -35,9 +35,15 @@ float cloudVol(in vec3 pos, float maxDistance ){
 	float cloudyFog = max(min(max(fog_shape - 0.6 ,0.0) * 2.0 ,1.0) - fog_erosion * 0.4	, 0.0)	*	exp(-0.05 * max(pos.y - (fogYstart+20),0.0));
 	float rainyFog = (low_gradientFog * 0.5 + exp2(-0.06 * max(pos.y - fogYstart,0.0))) * rainStrength * noPuddleAreas;
 	
-	if(sandStorm > 0.0 || snowStorm > 0.0){
+	if(sandStorm > 0.0 || snowStorm > 0.0 || rainStorm > 0.0){
 		float IntenseFogs = pow(1.0 - densityAtPosFog( (samplePos2  - vec3(frameTimeCounter,0,frameTimeCounter)*15.0) * 100.0),2.0) * mix(1.0, high_gradientFog, snowStorm);
-		cloudyFog = mix(cloudyFog, IntenseFogs, sandStorm+snowStorm);
+		// Clamped, because this is now a sum of three storms and mix() with a
+		// weight over 1.0 extrapolates PAST IntenseFogs rather than saturating at
+		// it. The three are meant to be mutually exclusive - rainStorm wants a
+		// temperate biome that precipitates rain, snowStorm wants CAT_ICY and
+		// sandStorm wants CAT_DESERT/CAT_MESA - but a modded biome can be in more
+		// than one category, and an unclamped weight there turns the fog inside out.
+		cloudyFog = mix(cloudyFog, IntenseFogs, clamp(sandStorm+snowStorm+rainStorm, 0.0, 1.0));
 
 		medium_gradientFog = 1.0;
 	}
