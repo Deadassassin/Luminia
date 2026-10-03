@@ -268,6 +268,7 @@ screen.Resource_Pack_Support = Resource_Pack_Support
         option.Rough_reflections = Rugosidade Detalhada
         option.Sky_reflection = Reflexos do Céu/Névoa
         option.Dynamic_SSR_quality = Qualidade Dinâmica do SSR
+        option.LUMINA_MATERIAL_REFLECTANCE = Materiais por Bloco
         option.Roughness_Threshold = Nível do Reflexo
         option.Sun_specular_Strength = Intensidade do Reflexo do Sol
         option.reflection_quality = Qualidade do SSR
@@ -381,6 +382,7 @@ screen.Resource_Pack_Support.comment = Um punhado de efeitos que usam informaç�
         option.Dynamic_SSR_quality.comment = Isso diminui a qualidade dos reflexos baseado na sua visibilidade. Pode aumentar a performance, mas diminui a qualidade. 
         option.Roughness_Threshold.comment = Se a rugosidade atingir seu limite, todos os reflexos, por excessão do sol, não vão renderizar. Pode aumentar a performance.
         option.Sun_specular_Strength.comment = Ajuste o quão brilhante o reflexo do sol é.
+        option.LUMINA_MATERIAL_REFLECTANCE.comment = Dá a cada bloco sua própria rugosidade e refletância, pela id do bloco, em vez de pegá-las da textura specular - que nada preenche, então todo bloco fica igual, sem reflexo, a não ser que esteja chovendo. Precisa de Reflexos Especulares acima. Quartzo não está na tabela de propósito, então continua fosco. §aCUSTO DE DESEMPENHO:§r nenhum
         option.reflection_quality.comment = Ajuste a qualidade dos reflexos no espaço de tela.
 
 screen.Subsurface_Scattering.comment = §bO Que é Isso?§r O espalhamento de subsuperfície é aquele efeito quando você coloca uma luz no seu dedo e ele começa a brilhar. O sol causa esse efeito em várias coisas, como: plantas, tecido, pele e outras coisas.

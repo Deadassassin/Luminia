@@ -447,6 +447,7 @@ screen.Resource_Pack_Support = Поддержка наборов ресурсо�
         option.Rough_reflections = Детализированная шероховатость
         option.Sky_reflection = Отражения неба и тумана
         option.Dynamic_SSR_quality = Динамическое качество ЭО
+        option.LUMINA_MATERIAL_REFLECTANCE = Материалы по блокам
         option.Roughness_Threshold = Порог отражения
         option.Sun_specular_Strength = Множитель отражения солнца
         option.reflection_quality = Качество ЭО
@@ -569,6 +570,7 @@ screen.Resource_Pack_Support.comment = Эффекты, использующие 
         option.Dynamic_SSR_quality.comment = Динамическое снижение качества экранных отражений в зависимости от видимости. Улучшает производительность, но снижает качество.
         option.Roughness_Threshold.comment = Порог шероховатости, при котором отражения (кроме солнечных) отключаются. Улучшает производительность.
         option.Sun_specular_Strength.comment = Яркость солнечных бликов.
+        option.LUMINA_MATERIAL_REFLECTANCE.comment = Задаёт каждому блоку собственную шероховатость и отражаемость по его id, вместо чтения из текстуры specular - которую никто не заполняет, поэтому без дождя все блоки одинаково матовые. Требует Зеркальные отражения выше. Кварц намеренно отсутствует в таблице и остаётся матовым. §aСТОИМОСТЬ ПРОИЗВОДИТЕЛЬНОСТИ:§r нет
         option.reflection_quality.comment = Качество экранных отражений.
 
 screen.Subsurface_Scattering.comment = §bЧто это?§r Подповерхностное рассеивание (SSS) — эффект свечения при подсветке (например, рука под фонарём). Солнце создаёт аналогичный эффект на растениях, ткани, коже и т.д.

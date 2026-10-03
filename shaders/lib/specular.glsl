@@ -345,9 +345,31 @@ void DoSpecularReflections(
 
 	// --------------- LIGHTSOURCE REFLECTIONS
 	// slap the main lightsource reflections to the final color.
+	//
+	// This is the only reflection path with no hasReflections gate, so in v0.4.2 it
+	// ran on every block in the world - including the ones the gate had just
+	// rejected as matte. That is what made a matte block look lit from within: not
+	// a glow, and not emission (nothing here writes EMISSIVE, and the emissive
+	// range in all_solid.vsh:277 is nowhere near a BLOCK_MAT_ id), but a broad,
+	// dim sheen added to a surface that had been told it reflects nothing.
+	//
+	// Quartz was the one that made it obvious, because quartz is deliberately not
+	// in lib/material_reflectance.glsl: it scores gate = -0.0033 against the 0.01
+	// cutoff, hasReflections is false, and every other path below is correctly
+	// switched off - while this one carried on regardless.
+	//
+	// Gating it makes the gate mean one thing in one place: a surface reflects or
+	// it does not, and which surfaces those are is decided in one place. It also
+	// fixes the direction of the error. The GGX lobe is steeply sensitive to
+	// roughness - at normal incidence the D*F term is orders of magnitude larger
+	// for a smooth surface than for a rough one - so ungated, the term was
+	// negligible on pale rough blocks and enormous on the metals. That is the
+	// opposite of the intended "a subtle sheen on rough surfaces".
 	#ifdef LIGHTSOURCE_REFLECTION
-		Lightsource_Reflection = Diffuse * GGX(Normal, -WorldPos, LightPos, Roughness, F0) * Metals;
-		Final_Reflection += Lightsource_Reflection * Sun_specular_Strength ;
+		if (hasReflections) {
+			Lightsource_Reflection = Diffuse * GGX(Normal, -WorldPos, LightPos, Roughness, F0) * Metals;
+			Final_Reflection += Lightsource_Reflection * Sun_specular_Strength ;
+		}
 	#endif
 
 	Output = Final_Reflection;

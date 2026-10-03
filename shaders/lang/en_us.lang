@@ -450,6 +450,7 @@ screen.Resource_Pack_Support = Resource Pack Support
         option.Rough_reflections = Detailed Roughness
         option.Sky_reflection = Sky/Fog in Reflections
         option.Dynamic_SSR_quality = Dynamic SSR Quality
+        option.LUMINA_MATERIAL_REFLECTANCE = Per-Block Materials
         option.Roughness_Threshold = Reflection Threshold
         option.Sun_specular_Strength = Sun Reflection Multiplier
         option.reflection_quality = SSR Quality
@@ -584,6 +585,7 @@ screen.Resource_Pack_Support.comment = A handfull of effects that use informatio
         option.Dynamic_SSR_quality.comment = This lowers the quality of screen-space reflections based on how visible they are. it can improve performance but lower the quality. 
         option.Roughness_Threshold.comment = If the roughness reaches this threshold, all reflections except the sun do not render. it can improve performance.
         option.Sun_specular_Strength.comment = Configure how bright the sun's reflection is.
+        option.LUMINA_MATERIAL_REFLECTANCE.comment = Give each block its own roughness and reflectance, keyed on the block id, instead of taking them from the specular texture - which nothing fills, so every block is the same flat matte unless it is raining. Needs Specular Reflections above. Quartz is deliberately not in the table, so it stays matte. §aPERFORMANCE COST:§r none
         option.reflection_quality.comment = Configure the quality of the screen-space reflections.
 
     screen.Path_Tracer.comment = A stochastic path tracer. Each bounce samples the GGX lobe rather than aiming one mirror direction, and the noise is averaged out over several frames. It replaces the screen-space reflections above rather than adding to them. §aPERFORMANCE COST:§r high - start with Lower bounces and Trace Steps if the frame time is wrong.

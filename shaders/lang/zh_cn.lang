@@ -475,6 +475,7 @@ screen.Resource_Pack_Support = 资源包支持
         option.Rough_reflections = 粗糙反射
         option.Sky_reflection = 天空/雾气反射
         option.Dynamic_SSR_quality = 动态 SSR 质量
+        option.LUMINA_MATERIAL_REFLECTANCE = 按方块的材质
         option.Roughness_Threshold = 粗糙反射阀值
         option.Sun_specular_Strength = 太阳反射强度
         option.reflection_quality = SSR 质量
@@ -597,6 +598,7 @@ screen.Resource_Pack_Support.comment = 由遵循 LabPBR 格式的资源包提供
         option.Dynamic_SSR_quality.comment = 会基于它们的可见程度降低屏幕空间反射质量. 以降低质量为代价提升性能. 
         option.Roughness_Threshold.comment = 粗糙度达到阈值后除了太阳反射外所有反射都不渲染. 可提升性能.
         option.Sun_specular_Strength.comment = 配置太阳反射亮度.
+        option.LUMINA_MATERIAL_REFLECTANCE.comment = 按方块 id 为每个方块指定自身的粗糙度与反射率，而不是读取 specular 贴图 —— 没有任何东西会写入它，所以不下雨时所有方块都是一样的哑光。需要上面的镜面反射。石英刻意不在表中，因此保持哑光。§a性能开销:§r 无
         option.reflection_quality.comment = 配置屏幕空间反射质量.
 
 screen.Subsurface_Scattering.comment = §b这是什么?§r 打个比方, 次表面散射类似于你把你的手盖住一个很亮的光源, 手掌呈现的那种从内部透光的感觉. 阳光实际上对植物, 衣服, 皮肤或者其它事物照耀都可以产生相同的效果.

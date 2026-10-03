@@ -303,3 +303,96 @@
 #define BLOCK_WALL_MAX 496
 #define BLOCK_END_PORTAL 500
 #define BLOCK_SIGN 501
+
+// =============================================================================
+// MATERIAL_REFLECTIVE_BLOCKS
+//
+// Ids for lib/material_reflectance.glsl. The blocks each one resolves to are at
+// the foot of block.properties.
+//
+// They exist because the inherited id table came from Chocapic and is ordered for
+// the light flood fill, so it contains no metal, ore or polished stone. The
+// fragment stage gets only mc_Entity.x as a per-block value (all_solid.vsh:235),
+// so all of those blocks arrived as one shared fallback id and could not be told
+// apart from each other.
+//
+// ---------------------------------------------------------------------------
+// WHY 1000 AND ABOVE, AND WHY THAT IS SAFE.
+//
+// The previous maximum id was 501 (BLOCK_SIGN), so nothing existing moves.
+//
+// A new id cannot make a block emit light, on either of the two paths that could:
+//
+//   * all_solid.vsh:277 marks a block emissive with
+//         if(mc_Entity.x >= 100 && mc_Entity.x < 300) EMISSIVE = 0.5;
+//     Every id here is >= 1000, so it is outside that range by a wide margin.
+//
+//   * ptBlockLightData() in lib/lpv_blocks.glsl selects the flood fill's light
+//     with `if (blockId == ...)` and guarded `if (blockId >= A && blockId <= B)`
+//     tests, none of which reach 1000. Its fallthrough defaults are
+//     lightRange 0.0 and mixMask 0x0000, so an id this table introduces is a
+//     block that emits nothing and passes no light - the same answer every other
+//     unlisted block already gets.
+//
+// Neither path indexes an array by id, so there is nothing for a large id to run
+// off the end of. Verified by reading both, not assumed.
+//
+// ---------------------------------------------------------------------------
+// QUARTZ IS NOT HERE, AND MUST NOT BE ADDED.
+//
+// Quartz and smooth quartz are intentionally absent, which is why 1013 and 1014
+// are unused: block.properties in v0.4.2 contains no entry for quartz_block at
+// all, so it resolved to the shared fallback id and had no material. Giving it an
+// id is what put quartz into the reflective path and made it pick up a highlight
+// it should never have had. It stays unlisted. Nothing in lib/
+// material_reflectance.glsl names it either, so quartz is matte - the same as it
+// was in 0.4.2.
+//
+// Prefixed BLOCK_MAT_ so they cannot collide with the light table's BLOCK_ names,
+// several of which cover different blocks entirely.
+#define BLOCK_MAT_IRON_BLOCK 1000
+#define BLOCK_MAT_GOLD_BLOCK 1001
+#define BLOCK_MAT_DIAMOND_BLOCK 1002
+#define BLOCK_MAT_EMERALD_BLOCK 1003
+#define BLOCK_MAT_LAPIS_BLOCK 1004
+#define BLOCK_MAT_REDSTONE_BLOCK 1005
+#define BLOCK_MAT_COAL_BLOCK 1006
+#define BLOCK_MAT_COPPER_BLOCK 1007
+#define BLOCK_MAT_COPPER_EXPOSED 1008
+#define BLOCK_MAT_COPPER_WEATHERED 1009
+#define BLOCK_MAT_RAW_COPPER_BLOCK 1010
+#define BLOCK_MAT_RAW_GOLD_BLOCK 1011
+#define BLOCK_MAT_RAW_IRON_BLOCK 1012
+// 1013 and 1014 are deliberately unassigned: they were quartz and smooth quartz.
+#define BLOCK_MAT_OBSIDIAN 1015
+#define BLOCK_MAT_CALCITE 1016
+#define BLOCK_MAT_TUFF 1017
+#define BLOCK_MAT_POLISHED 1018
+#define BLOCK_MAT_PURPUR 1019
+#define BLOCK_MAT_NETHERRACK 1020
+#define BLOCK_MAT_MUSHROOM_STEM 1021
+#define BLOCK_MAT_MUD 1022
+#define BLOCK_MAT_HONEYCOMB 1023
+#define BLOCK_MAT_BUDDING_AMETHYST 1024
+#define BLOCK_MAT_AMETHYST 1025
+#define BLOCK_MAT_DEEPSLATE 1026
+#define BLOCK_MAT_PRISMARINE 1027
+#define BLOCK_MAT_SNOW_BLOCK 1028
+#define BLOCK_MAT_BLUE_ICE 1029
+#define BLOCK_MAT_IRON_ORE 1030
+#define BLOCK_MAT_GOLD_ORE 1031
+#define BLOCK_MAT_DIAMOND_ORE 1032
+#define BLOCK_MAT_EMERALD_ORE 1033
+#define BLOCK_MAT_REDSTONE_ORE 1034
+#define BLOCK_MAT_LAPIS_ORE 1035
+#define BLOCK_MAT_COAL_ORE 1036
+#define BLOCK_MAT_ANVIL 1037
+#define BLOCK_MAT_CHAIN 1038
+#define BLOCK_MAT_IRON_BARS 1039
+#define BLOCK_MAT_CONCRETE 1040
+#define BLOCK_MAT_GLAZED_TERRACOTTA 1041
+#define BLOCK_MAT_WOOL 1042
+#define BLOCK_MAT_STAINED_GLASS 1043
+#define BLOCK_MAT_STAINED_GLASS_PANE 1044
+#define BLOCK_MAT_CRYING_OBSIDIAN 1045
+#define BLOCK_MAT_PACKED_ICE 1046

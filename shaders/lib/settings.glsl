@@ -506,6 +506,27 @@ const float shadowDistance = 128.0; // [32.0 48.0 64.0 80.0 96.0 112.0 128.0 144
 #define reflection_quality 30 // [6.0 7.0 8.0 9.0 10.0 11.0 12.0 13.0 14.0 15.0 16.0 17.0 18.0 19.0 20.0 25.0 30.0 35.0 40.0 45.0 50.0 55.0 60.0 65.0 70.0 75.0 80.0 85.0 90.0 95.0 100.0 ]
 #define Roughness_Threshold 1.2 // [1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]
 
+// Per-block reflection materials, from lib/material_reflectance.glsl.
+//
+// Without it, the roughness and F0 that lib/specular.glsl's reflection gate tests
+// arrive in the red and green channels of the `specular` texture - a single black
+// pixel, because nothing writes it ("4 read one pixel, because nothing fills them
+// yet: [normals, specular, colortex1, depthtex0]"). Rain was the only thing that
+// ever reached those channels, which is why in v0.4.2 a block reflected when wet
+// and was flat matte when dry whatever it was made of. This decides the material
+// from the block id instead, which is the per-block value the fragment stage
+// actually has (all_solid.vsh:235, blockID from mc_Entity.x).
+//
+// Needs Specular_Reflections above, since that is the master switch: without it
+// nothing calls the code that reads these two channels, and they would carry
+// nothing that means anything.
+//
+// It only writes roughness and F0. It cannot make a block emit - see the note at
+// the foot of lib/material_reflectance.glsl, and the note on the BLOCK_MAT_ ids at
+// the foot of lib/blocks.glsl for why the 1000+ range cannot reach the emissive
+// range in all_solid.vsh:277 or the light table in lib/lpv_blocks.glsl.
+#define LUMINA_MATERIAL_REFLECTANCE
+
 #ifdef Specular_Reflections
 	#define LIGHTSOURCE_REFLECTION
 #endif
