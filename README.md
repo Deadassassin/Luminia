@@ -9,7 +9,7 @@ I wanted a more realistic Shader so I grabbed bliss as a base and removed and ad
 
 # UNSTABLE VERSION
 
-`Unstable versions` are the ABSOLUTE latest versions, and are released very frequently and are likely to have bugs and issues or missing features. When this branch reaches a stable enough state, it is merged into the Stable branch. **Please report any issues you find.**
+`Unstable versions` are the latest versions, likely to have bugs and issues or missing features. **Please report any issues you find.**
 
 
 ## How to download the `unstable` version:
