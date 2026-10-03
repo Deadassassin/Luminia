@@ -4,16 +4,7 @@ An edit of Bliss, which is itself an edit of Chocapic13's shaders.
 
 <img src="assets/preview.png" width="100%">
 
-I always loved Chocapic's shaders, and how customizable it was. But I wanted MORE.
-I eventually started tweaking the shader, adding settings, breaking stuff, and after a while wanted to impose my own visual style onto the shader.
-I wanted to emphasize a varying scene, where the lighting isn't always the same whenever or wherever you are.
-
-### SPECIAL THANKS:
-+ Chocapic13, for the base shader
-+ WoMspace, for spending a lot of time creating a DOF overhaul
-+ Null, for doing a huge amount of work creating the voxel floodfill colored lighting
-+ Emin, and Gri573, for teaching me how to stop a lot of light leaking
-+ RRe36 and Sixthsurge, for the great ideas to steal
+I wanted a more realistic Shader so I grabbed bliss as a base and removed and added content from other shader packs.
 
 ### [Come join my discord server!](https://discord.gg/8nVt56H9zH)
 ### [Want to support me? Consider donating](https://ko-fi.com/xonkdev)
