@@ -268,13 +268,28 @@
 // The defaults are high because TAA is on, and TAA accumulates across frames -
 // so the noise a high count produces is resolved over a few frames rather than
 // being visible as grain. Without TAA to average it, 12 x 28 is noise.
-#define RAY_COUNT 12 // [1 2 3 4 5 6 7 8 9 10 12 14 16 18 21 24 28 32 37 43 49 57 65 75 86 100]
+//
+// Luminia v0.5b lowered this from 12 to 8. TAA is still doing the averaging, so
+// the grain argument still holds; what changed is that 8 rays with 28 steps is
+// visibly cheaper than 12 with 28, and the tracer's output is dominated by the
+// step count anyway. This is the path tracer's sample count and has nothing to do
+// with the reflection work - it only matters when PATH_TRACER is defined.
+#define RAY_COUNT 8 // [1 2 3 4 5 6 7 8 9 10 12 14 16 18 21 24 28 32 37 43 49 57 65 75 86 100]
 #define STEPS 28	//  [6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99]
 #define STEP_LENGTH 21.	//  [4.  5.  6.  7.  8.  9. 10. 11. 12. 13. 14. 15. 16. 17. 18. 19. 20. 21. 22. 23. 24. 25. 26. 27. 28. 29. 30.]
 
 
 #define SEPARATE_AO
-const float ambientOcclusionLevel = 1.0; // this controls vanilla minecrafts ambient occlusion. [0.0 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.11 0.12 0.13 0.14 0.15 0.16 0.17 0.18 0.19 0.2 0.21 0.22 0.23 0.24 0.25 0.26 0.27 0.28 0.29 0.3 0.31 0.32 0.33 0.34 0.35 0.36 0.37 0.38 0.39 0.4 0.41 0.42 0.43 0.44 0.45 0.46 0.47 0.48 0.49 0.5 0.51 0.52 0.53 0.54 0.55 0.56 0.57 0.58 0.59 0.6 0.61 0.62 0.63 0.64 0.65 0.66 0.67 0.68 0.69 0.7 0.71 0.72 0.73 0.74 0.75 0.76 0.77 0.78 0.79 0.8 0.81 0.82 0.83 0.84 0.85 0.86 0.87 0.88 0.89 0.9 0.91 0.92 0.93 0.94 0.95 0.96 0.97 0.98 0.99 1.0 ]
+// Luminia v0.5b lowered this from 1.0 to 0.23.
+//
+// This scales the ambient occlusion the GAME hands the shader - not the pack's
+// own AO, which is AO_Strength and PhotonGTAO. 1.0 passes it through untouched;
+// 0.23 keeps the strongest 23% of it. The visible effect is that corners, the
+// inside of overhangs and contact points under blocks stop crushing to black and
+// go soft instead, which reads as a flatter, more open interior - especially in
+// low light, where the game's AO is at its strongest and was doing most of the
+// darkening.
+const float ambientOcclusionLevel = 0.23; // this controls vanilla minecrafts ambient occlusion. [0.0 0.01 0.02 0.03 0.04 0.05 0.06 0.07 0.08 0.09 0.1 0.11 0.12 0.13 0.14 0.15 0.16 0.17 0.18 0.19 0.2 0.21 0.22 0.23 0.24 0.25 0.26 0.27 0.28 0.29 0.3 0.31 0.32 0.33 0.34 0.35 0.36 0.37 0.38 0.39 0.4 0.41 0.42 0.43 0.44 0.45 0.46 0.47 0.48 0.49 0.5 0.51 0.52 0.53 0.54 0.55 0.56 0.57 0.58 0.59 0.6 0.61 0.62 0.63 0.64 0.65 0.66 0.67 0.68 0.69 0.7 0.71 0.72 0.73 0.74 0.75 0.76 0.77 0.78 0.79 0.8 0.81 0.82 0.83 0.84 0.85 0.86 0.87 0.88 0.89 0.9 0.91 0.92 0.93 0.94 0.95 0.96 0.97 0.98 0.99 1.0 ]
 
 
 
@@ -707,12 +722,39 @@ const float shadowDistance = 128.0; // [32.0 48.0 64.0 80.0 96.0 112.0 128.0 144
 #define Emissive_Curve 2.0 // [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]
 
 
-// #define POM
-// #define Horrible_slope_normals
+// POM, parallax occlusion mapping, and the two defaults it was previously missing.
+//
+// POM was OFF by default and is now on, with POM_DEPTH 0.75 (was 0.25) and
+// MAX_DIST 50.0 (was 25.0). Depth is the part that matters visually: 0.25 is a
+// shallow relief that barely reads on a flat wall, 0.75 gives the layers real
+// separation. MAX_DIST is how far the ray walks before giving up, and at 25.0 a
+// deep block's front layers were consumed before the ray reached the back of it
+// - which is what makes a too-low MAX_DIST look like the parallax simply stops.
+//
+// Two costs worth stating plainly, since this is a default and not a per-user
+// opt-in any more:
+//
+//   * PERFORMANCE. POM runs up to MAX_ITERATIONS (35) steps per fragment, on
+//     albedo, normals and specular. That is the most expensive single option in
+//     the pack and it is now paid by default. MAX_ITERATIONS is the first thing
+//     to lower if it matters more than the depth.
+//
+//   * NORMAL MAPS. POM derives its offset from the normals texture, so with no
+//     normal-map resource pack installed there is no normal to derive it from and
+//     the effect is at best inert. It does not break - all_solid.fsh routes every
+//     sample through texture2D_POMSwitch(), which falls back to a plain LOD
+//     sample when ifPOM is false, and that fallback is what a pack with no normals
+//     ends up taking. But you are paying for the steps and getting no relief.
+//
+// Horrible_slope_normals comes on with it. It is the fix for POM's worst
+// artefact: on a steeply sloped block face the offset marches so far along the
+// surface that it samples off the block entirely and the edge smears.
+#define POM
+#define Horrible_slope_normals
 #define Adaptive_Step_length
-#define POM_DEPTH 0.25 // [0.025 0.05 0.075 0.1 0.125 0.15 0.20 0.25 0.30 0.50 0.75 1.0]
+#define POM_DEPTH 0.75 // [0.025 0.05 0.075 0.1 0.125 0.15 0.20 0.25 0.30 0.50 0.75 1.0]
 #define MAX_ITERATIONS 35 // [5 10 15 20 25 30 40 50 60 70 80 90 100 125 150 200 400]
-#define MAX_DIST 25.0 // [5.0 10.0 15.0 20.0 25.0 30.0 40.0 50.0 60.0 70.0 80.0 90.0 100.0 125.0 150.0 200.0 400.0]
+#define MAX_DIST 50.0 // [5.0 10.0 15.0 20.0 25.0 30.0 40.0 50.0 60.0 70.0 80.0 90.0 100.0 125.0 150.0 200.0 400.0]
 
 #define SSS_TYPE 2 // [0 1 2 3]
 #define LabSSS_Curve 1.0 // [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 2.8 2.9 3.0 ]
@@ -779,6 +821,39 @@ uniform int moonPhase;
 	#endif
 
 #endif
+
+// ---------------------------------------------------------------------------
+// Luminia v0.5b DEFAULTS
+//
+// Seven options were changed to new pack defaults. They are baked into
+// lib/settings.glsl rather than shipped in the .txt beside the pack, which is the
+// difference between "this is what the pack does" and "this is what one install
+// happens to have overridden". A fresh install of Luminia v0.5b gets all seven
+// without the user touching anything.
+//
+//   RAY_COUNT               12 -> 8
+//   ambientOcclusionLevel   1.0 -> 0.23
+//   LARGE_WAVE_DISPLACEMENT  on -> off
+//   POM                     off -> on
+//   POM_DEPTH               0.25 -> 0.75
+//   MAX_DIST                25.0 -> 50.0
+//   Horrible_slope_normals  off -> on
+//
+// Two of these are worth a note beyond the comment at their own definition.
+//
+// LARGE_WAVE_DISPLACEMENT is now OFF. It displaces the water surface by a large
+// amount, which is a deliberate look rather than a fix, and it is one of the two
+// things about this pack most likely to read as "wrong" to someone who did not
+// choose it. The note above its definition explains what it does to distant,
+// GRASS-free water; the short version is that it needs grass or debris in frame
+// to hide behind. Off by default, still one click away.
+//
+// ambientOcclusionLevel 0.23 is the vanilla-Minecraft AO term, not the pack's own
+// AO. It multiplies the AO the game hands the shader, so it scales down how dark
+// contact shading goes in corners and under overhangs. 1.0 passes the game's AO
+// through untouched; 0.23 keeps only the strongest 23% of it, which is a flatter,
+// softer look that does not crush corners to black in low light.
+// ---------------------------------------------------------------------------
 
 #define SKY_GROUND
 
@@ -1224,7 +1299,12 @@ const vec3 aerochrome_color = mix(vec3(1.0, 0.0, 0.0), vec3(0.715, 0.303, 0.631)
 // and a big one close to a small one beats against itself - visible as patches
 // of flat water that drift. GRASS-free water at a distance is where it shows
 // most, since there is nothing else in frame to hide it.
-#define LARGE_WAVE_DISPLACEMENT
+//
+// Luminia v0.5b turned this OFF. It is a look rather than a fix, and it is the
+// single most likely thing in this pack to read as a bug to someone who did not
+// choose it, so it no longer ships on by default. Still one click away on the
+// Water screen.
+// #define LARGE_WAVE_DISPLACEMENT
 
 #define SELECT_BOX
 #define SELECT_BOX_COL_R 0.0 // [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
