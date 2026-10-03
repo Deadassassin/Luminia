@@ -782,6 +782,70 @@ uniform int moonPhase;
 
 #define SKY_GROUND
 
+// ---------------------------------------------------------------------------
+// AURORA
+//
+// The maths is nimitz's, ported from Eclipse - see lib/aurora.glsl for the
+// original and for what had to change to fit this pack's sky. Attribution and
+// licence are at the top of that file.
+//
+// WHERE IT SHOWS is the part that is deliberately different from Eclipse's.
+// Eclipse gates it on the biome from shaders.properties:
+//
+//     uniform.float.auroraAmount = smooth(if(biome_precipitation == 2, 1.0, 0.0), ...)
+//
+// so it is a snow-biome effect, and a badlands or a savanna - which report no
+// precipitation at all - could never see one. A magnetic display has nothing to
+// do with whether it is hailing, so here the biome is not consulted at all and
+// AURORA_CHANCE alone decides, as a stable roll on the day rather than a
+// per-frame random. An aurora that appears lasts the night.
+//
+// Eclipse's AURORA_LOCATION (0 off / 1 snowy biome / 2 always) is therefore NOT
+// ported: with the biome gate gone, 0 and 2 are the only two meanings left, and
+// the off case is what AURORA_CHANCE 0 does. Keeping the option would have meant
+// keeping a middle setting that contradicts the gate it used to depend on.
+//
+// AURORA_R/G/B are PHASE OFFSETS into a sine, not colour channels - which is why
+// the defaults are 2.25 / -0.5 / 1.2, they go negative, and equal values give a
+// flat single colour rather than an error.
+//
+// AURORA_GAIN is new and has no Eclipse equivalent by that name. Eclipse calls
+// aurora() twice, with its two call sites carrying different scales (2.4 into the
+// sky buffer, 0.0875 over the composited scene). This pack has one sky write, so
+// one of those scales had to survive somewhere, and it is this.
+// ---------------------------------------------------------------------------
+// The switch the player actually gets is AURORA_CHANCE, and 0 is a genuine off:
+// composite1.fsh guards its include and its call on it, so both the loop and
+// lib/aurora.glsl itself are absent from the generated code at 0.
+//
+// There is deliberately no separate AURORA toggle beside it. Two reasons, and the
+// second is the one that bit:
+//
+//   * The obvious way to write it - a #define AURORA, plus an AURORA entry on a
+//     screen - collides with the screen itself. Iris matches screen.<name> and
+//     option.<name> on the same key, so `screen.AURORA = AURORA ...` makes the two
+//     the same name and the toggle stops rendering. Eclipse dodges this only by
+//     naming its screen AURORA_SETTINGS, which is why the screen here is [Aurora].
+//
+//   * A #define that is enabled but appears on no screen is exactly what the
+//     validator reports as "enabled but is on no settings screen, so it cannot be
+//     turned off by the player". The empty `#ifdef AURORA / #endif` idiom used by
+//     the biome section below does not help: it registers the name just the same.
+//     Thirteen of this pack's options are already in that state (PT_SCALE,
+//     HQ_CLOUDS, SEA_LEVEL, ...), and being the fourteenth is not worth it for a
+//     switch that duplicates AURORA_CHANCE.
+//
+// So AURORA is not defined at all, and lib/aurora.glsl is included under
+// `#if AURORA_CHANCE > 0` - a real option, on a real screen, that actually
+// switches the feature off.
+#define AURORA_MOON
+#define AURORA_CHANCE 100 // [0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85 90 95 100] percent of days an aurora appears; 0 is off
+#define AURORA_BRIGHTNESS 1.0 // [0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4 1.5 1.6 1.7 1.8 1.9 2.0 2.5 3.0 3.5 4.0 4.5 5.0]
+#define AURORA_GAIN 2.4 // [0.5 1.0 1.5 2.0 2.4 3.0 4.0 5.0 6.0 8.0 10.0] overall strength; this is the scale Eclipse's second call site carried
+#define AURORA_R 2.25 // [-5.0 -4.5 -4.0 -3.5 -3.0 -2.5 -2.0 -1.5 -1.0 -0.5 0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0]
+#define AURORA_G -0.5 // [-5.0 -4.5 -4.0 -3.5 -3.0 -2.5 -2.0 -1.5 -1.0 -0.5 0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0]
+#define AURORA_B 1.2 // [-5.0 -4.5 -4.0 -3.5 -3.0 -2.5 -2.0 -1.5 -1.0 -0.5 0.0 0.5 1.0 1.5 2.0 2.5 3.0 3.5 4.0 4.5 5.0]
+
 
 ////////////////////////////////////////
 // ----- CLOUD RELATED SETTINGS ----- //

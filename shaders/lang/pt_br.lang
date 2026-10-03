@@ -210,6 +210,15 @@ screen.Climate = Ajustes Climáticos
 
 
 screen.World = Mundo
+    screen.Aurora = Aurora
+        option.AURORA_CHANCE = Chance de Aurora
+        suffix.AURORA_CHANCE = %
+        option.AURORA_MOON = Só quando a lua estiver baixa
+        option.AURORA_GAIN = Intensidade da Aurora
+        option.AURORA_BRIGHTNESS = Brilho da Aurora
+        option.AURORA_R = Fase R da Aurora
+        option.AURORA_G = Fase G da Aurora
+        option.AURORA_B = Fase B da Aurora
     screen.Water = Ajustes da Água
         option.WATER_REFLECTIONS = Reflexos Especulares na Água
         option.SCREENSPACE_REFLECTIONS = Reflexos no Espaço da Tela / SSR
@@ -447,6 +456,14 @@ screen.Clouds.comment = Ajustes relacionados a nuvens volumétricas.
     option.Alto_density.comment = Ajuste a densidade das camadas superiores de nuvens.
 
 screen.World.comment = Ajuste configurações para váriadas coisas que acontecem no mundo, o balançar das plantas e a água.
+    screen.Aurora.comment = Auroras no céu noturno, desenhadas atrás das nuvens. Chance é a porcentagem de dias do jogo em que uma aparece, e então dura a noite toda. §aCUSTO DE DESEMPENHO:§r baixo, só à noite
+        option.AURORA_CHANCE.comment = Porcentagem de dias em que uma aurora aparece. 0 desliga completamente. Não depende do bioma - diferente do Eclipse, que só mostra em biomas nevados.
+        option.AURORA_MOON.comment = Mostra a aurora só enquanto a lua está abaixo do horizonte.
+        option.AURORA_GAIN.comment = Intensidade geral da aurora.
+        option.AURORA_BRIGHTNESS.comment = Brilho aplicado dentro do efeito, antes da intensidade acima.
+        option.AURORA_R.comment = Deslocamento de fase do canal vermelho, não uma cor. Os três percorrem a emissão do verde ao magenta conforme sobem na cortina. Valores iguais dão uma cor única chapada, o que é um visual válido. §aCUSTO DE DESEMPENHO:§r nenhum
+        option.AURORA_G.comment = Deslocamento de fase do canal verde, não uma cor. Veja Fase R da Aurora. §aCUSTO DE DESEMPENHO:§r nenhum
+        option.AURORA_B.comment = Deslocamento de fase do canal azul, não uma cor. Veja Fase R da Aurora. §aCUSTO DE DESEMPENHO:§r nenhum
     screen.Water.comment = Ajustes relacionados a água.
         option.WATER_REFLECTIONS.comments = Habilite todos os reflexos para coisas translúcidas. Isso permite outras configurações abaixo. §aCUSTO DE PERFORMANCE:§r Baixo
         option.SCREENSPACE_REFLECTIONS.comment = Habilita reflexos no espaço de tela em coisas translúcidas. §aCUSTO DE PERFORMANCE:§r Médio
