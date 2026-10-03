@@ -6,8 +6,6 @@ An edit of Bliss, which is itself an edit of Chocapic13's shaders.
 
 I wanted a more realistic Shader so I grabbed bliss as a base and removed and added content from other shader packs.
 
-### [Come join my discord server!](https://discord.gg/8nVt56H9zH)
-### [Want to support me? Consider donating](https://ko-fi.com/xonkdev)
 
 # UNSTABLE VERSION
 
