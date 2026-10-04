@@ -171,6 +171,22 @@ vec3 toScreenSpace(vec3 p) {
 #include "/lib/Shadows.glsl"
 #include "/lib/stars.glsl"
 
+// The aurora, for the night sky written below.
+//
+// Guarded because it needs frameTimeCounter, worldDay and the WsunVec family, all
+// of which exist in this pass, but the effect is only worth the include when it
+// can actually be drawn - and it cannot, in the nether or the end, or with
+// AURORA_CHANCE at 0.
+// Guarded on AURORA_CHANCE, which is the player-facing switch and where 0 is a
+// real off. At 0 the include does not happen at all, so lib/aurora.glsl and the
+// 21-step loop inside it are simply not part of this pass.
+//
+// The macro is LUMINA_-prefixed so it cannot collide with the AURORA_* option
+// names, which all share the AURORA prefix.
+#if AURORA_CHANCE > 0
+	#include "/lib/aurora.glsl"
+#endif
+
 #ifdef OVERWORLD_SHADER
 	
 	#define CLOUDSHADOWSONLY
@@ -989,6 +1005,38 @@ void main() {
 			#endif
 
 			Background += resourcePackskyBox;
+		#endif
+
+		#if AURORA_CHANCE > 0 && defined OVERWORLD_SHADER
+			// ---- AURORA ----
+			//
+			// Added to Background rather than to Sky, and BEFORE the clouds are
+			// composited over it. That ordering is what makes it sit behind the cloud
+			// deck: the block below does `Background = Background * Clouds.a +
+			// Clouds.rgb`, so anything already in Background is masked by cloud alpha
+			// and ends up behind them. Adding it after would draw the aurora over the
+			// clouds, which reads as a reflection on their underside.
+			//
+			// The gates, in the order they are worth checking:
+			//
+			//   WsunVec.y < 0      night. The effect also fades itself in over dusk
+			//                      (smoothstep(0.0, -0.1, WsunVecY) inside aurora()), so
+			//                      this is a hard cut at sunset that the interior one
+			//                      softens - it stops the loop running all day for a
+			//                      result that is multiplied to nothing.
+			//   auroraTonight()    the per-day chance roll, evaluated once and
+			//                      compile-folded away at AURORA_CHANCE 100.
+			//   AURORA_MOON        handled inside aurora() itself, since it scales the
+			//                      colour rather than skipping the loop.
+			//
+			// WmoonVecY is derived rather than passed: this pack has no moon vector in
+			// this pass (drawMoon is handed `lightCol.a * WsunVec` instead, at line
+			// ~973), and the moon is by construction opposite the sun, so its elevation
+			// is -sun elevation. That is exact enough for a smoothstep(0.1, 0.0) gate
+			// that only decides whether the sky is bright.
+			if (WsunVec.y < 0.0 && auroraTonight() > 0.5) {
+				Background += aurora(feetPlayerPos_normalized, 21, blueNoise(), -WsunVec.y, WsunVec.y);
+			}
 		#endif
 
 		#if defined OVERWORLD_SHADER && defined VOLUMETRIC_CLOUDS && !defined CLOUDS_INTERSECT_TERRAIN

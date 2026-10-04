@@ -213,9 +213,33 @@ vec2 dcdx = dFdx(vtexcoord.st*vtexcoordam.pq)*exp2(Texture_MipMap_Bias);
 vec2 dcdy = dFdy(vtexcoord.st*vtexcoordam.pq)*exp2(Texture_MipMap_Bias);
 
 
-#define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
-#define  projMAD(m, v) (diagonal3(m) * (v) + (m)[3].xyz)
-
+// projMAD and diagonal3 are NOT redefined here, though this file used to define
+// both just above this function.
+//
+// lib/util.glsl:27-28 already defines them, and it is included at line 71 - i.e.
+// ABOVE here. Redefining a macro with a different body is a hard error, not a
+// warning: glslangValidator reports
+//
+//     '#define' : Macro redefined; different substitutions: diagonal3
+//     '' : missing #endif
+//
+// in gbuffers_damagedblock.fsh, for every world dimension. The "missing #endif"
+// is not a second bug - glslang gives up tracking conditionals once the
+// redefinition has confused it.
+//
+// It never fired before because this block is inside `#if defined
+// DAMAGE_BLOCK_EFFECT && defined POM`, and POM was OFF by default, so the
+// preprocessor discarded the whole span including the duplicate defines. Turning
+// POM on for v0.5b brought the line out of the dead branch and the latent error
+// with it. Three programs went from compiling to not compiling: gbuffers_damagedblock
+// in world0, world1 and world-1.
+//
+// The two copies are also not equivalent textually - this file's said
+//
+//     #define diagonal3(m) vec3((m)[0].x, (m)[1].y, m[2].z)
+//
+// while util.glsl builds the same value as vec3(diagonal2(m), m[2].z) - identical
+// arithmetic, different spelling. So dropping the duplicate loses nothing.
 uniform mat4 gbufferProjection;
 
 vec3 toClipSpace3(vec3 viewSpacePosition) {

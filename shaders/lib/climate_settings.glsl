@@ -137,8 +137,10 @@
 	uniform float isJungles;
 	uniform float isSwamps;
 	uniform float isDarkForests;
+	uniform float isDeserts;
 	uniform float sandStorm;
 	uniform float snowStorm;
+	uniform float rainStorm;
 
 #ifdef PER_BIOME_ENVIRONMENT
 
@@ -149,15 +151,15 @@
 
 		// this is a little complicated? lmao
 		vec3 BiomeColors = vec3(0.0);
-		BiomeColors.r = isSwamps*SWAMP_R + isJungles*JUNGLE_R + isDarkForests*DARKFOREST_R + sandStorm*1.0 + snowStorm*0.6;
-		BiomeColors.g = isSwamps*SWAMP_G + isJungles*JUNGLE_G + isDarkForests*DARKFOREST_G + sandStorm*0.5 + snowStorm*0.8;
-		BiomeColors.b = isSwamps*SWAMP_B + isJungles*JUNGLE_B + isDarkForests*DARKFOREST_B + sandStorm*0.3 + snowStorm*1.0;
+		BiomeColors.r = isSwamps*SWAMP_R + isJungles*JUNGLE_R + isDarkForests*DARKFOREST_R + isDeserts*DESERT_R + rainStorm*0.25 + sandStorm*1.0 + snowStorm*0.6;
+		BiomeColors.g = isSwamps*SWAMP_G + isJungles*JUNGLE_G + isDarkForests*DARKFOREST_G + isDeserts*DESERT_G + rainStorm*0.28 + sandStorm*0.5 + snowStorm*0.8;
+		BiomeColors.b = isSwamps*SWAMP_B + isJungles*JUNGLE_B + isDarkForests*DARKFOREST_B + isDeserts*DESERT_B + rainStorm*0.34 + sandStorm*0.3 + snowStorm*1.0;
 
 		// insure the biome colors are locked to the fog shape and lighting, but not its orignal color.
 		BiomeColors *= max(dot(FinalFogColor,vec3(0.33333)), MIN_LIGHT_AMOUNT*0.025 + nightVision*0.2); 
 		
 		// these range 0.0-1.0. they will never overlap.
-		float Inbiome = isJungles+isSwamps+isDarkForests+sandStorm+snowStorm;
+		float Inbiome = isJungles+isSwamps+isDarkForests+isDeserts+rainStorm+sandStorm+snowStorm;
 
 		// interpoloate between normal fog colors and biome colors. the transition speeds are conrolled by the biome uniforms.
 		FinalFogColor = mix(FinalFogColor, BiomeColors, Inbiome);
@@ -169,14 +171,14 @@
 		float maxDistance
 	){	
 		// these range 0.0-1.0. they will never overlap.
-		float Inbiome = isJungles+isSwamps+isDarkForests+sandStorm+snowStorm;
+		float Inbiome = isJungles+isSwamps+isDarkForests+isDeserts+rainStorm+sandStorm+snowStorm;
 
 		vec2 BiomeFogDensity = vec2(0.0); // x = uniform  ||  y = cloudy
 		// BiomeFogDensity.x = isSwamps*SWAMP_UNIFORM_DENSITY + isJungles*JUNGLE_UNIFORM_DENSITY + isDarkForests*DARKFOREST_UNIFORM_DENSITY + sandStorm*15  + snowStorm*150;
 		// BiomeFogDensity.y = isSwamps*SWAMP_CLOUDY_DENSITY + isJungles*JUNGLE_CLOUDY_DENSITY + isDarkForests*DARKFOREST_CLOUDY_DENSITY + sandStorm*255 + snowStorm*255;
 
-		BiomeFogDensity.x = isSwamps*SWAMP_UNIFORM_DENSITY + isJungles*JUNGLE_UNIFORM_DENSITY + isDarkForests*DARKFOREST_UNIFORM_DENSITY + sandStorm*0.0 + snowStorm*0.01;
-		BiomeFogDensity.y = isSwamps*SWAMP_CLOUDY_DENSITY + isJungles*JUNGLE_CLOUDY_DENSITY + isDarkForests*DARKFOREST_CLOUDY_DENSITY + sandStorm*0.5 + snowStorm*0.5;
+		BiomeFogDensity.x = isSwamps*SWAMP_UNIFORM_DENSITY + isJungles*JUNGLE_UNIFORM_DENSITY + isDarkForests*DARKFOREST_UNIFORM_DENSITY + isDeserts*DESERT_UNIFORM_DENSITY + rainStorm*0.02 + sandStorm*0.0 + snowStorm*0.01;
+		BiomeFogDensity.y = isSwamps*SWAMP_CLOUDY_DENSITY + isJungles*JUNGLE_CLOUDY_DENSITY + isDarkForests*DARKFOREST_CLOUDY_DENSITY + isDeserts*DESERT_CLOUDY_DENSITY + rainStorm*0.4 + sandStorm*0.5 + snowStorm*0.5;
 		
 		UniformDensity = mix(UniformDensity, vec4(BiomeFogDensity.x), Inbiome*maxDistance);
 		CloudyDensity  = mix(CloudyDensity,  vec4(BiomeFogDensity.y), Inbiome*maxDistance);
@@ -186,9 +188,9 @@
 		
 		// this is a little complicated? lmao
 		vec3 BiomeColors = vec3(0.0);
-		BiomeColors.r = isSwamps*SWAMP_R + isJungles*JUNGLE_R + isDarkForests*DARKFOREST_R + sandStorm*1.0 + snowStorm*0.6;
-		BiomeColors.g = isSwamps*SWAMP_G + isJungles*JUNGLE_G + isDarkForests*DARKFOREST_G + sandStorm*0.3 + snowStorm*0.8;
-		BiomeColors.b = isSwamps*SWAMP_B + isJungles*JUNGLE_B + isDarkForests*DARKFOREST_B + sandStorm*0.1 + snowStorm*1.0;
+		BiomeColors.r = isSwamps*SWAMP_R + isJungles*JUNGLE_R + isDarkForests*DARKFOREST_R + isDeserts*DESERT_R + rainStorm*0.25 + sandStorm*1.0 + snowStorm*0.6;
+		BiomeColors.g = isSwamps*SWAMP_G + isJungles*JUNGLE_G + isDarkForests*DARKFOREST_G + isDeserts*DESERT_G + rainStorm*0.28 + sandStorm*0.3 + snowStorm*0.8;
+		BiomeColors.b = isSwamps*SWAMP_B + isJungles*JUNGLE_B + isDarkForests*DARKFOREST_B + isDeserts*DESERT_B + rainStorm*0.34 + sandStorm*0.1 + snowStorm*1.0;
 
 		// insure the biome colors are locked to the fog shape and lighting, but not its orignal color.
 		// DirectLightCol = BiomeColors * max(dot(DirectLightCol,vec3(0.33333)), MIN_LIGHT_AMOUNT*0.025 + nightVision*0.2); 
@@ -198,7 +200,7 @@
 		IndirectLightCol = BiomeColors * max(dot(IndirectLightCol,vec3(0.33333)), MIN_LIGHT_AMOUNT*0.025 + nightVision*0.2); 
 		
 		// these range 0.0-1.0. they will never overlap.
-		float Inbiome = isJungles+isSwamps+isDarkForests+sandStorm+snowStorm;
+		float Inbiome = isJungles+isSwamps+isDarkForests+isDeserts+rainStorm+sandStorm+snowStorm;
 
 		return Inbiome;
 	}

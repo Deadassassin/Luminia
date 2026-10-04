@@ -16,6 +16,18 @@ uniform int worldTime;
 #define WEATHERCLOUDS
 #include "/lib/climate_settings.glsl"
 
+// Eclipse's storm cloud gate. Declared here rather than in climate_settings.glsl
+// because this is the only file that reads it, and volumetricClouds.glsl is
+// reached by several passes that do not all have climate_settings in scope.
+//
+// Set in shaders/shaders.properties, which sets it to 1.0 when CUMULONIMBUS is
+// off and otherwise ramps it with thunderStrength. Guarded so the declaration
+// cannot collide if a pass reaches this file by a path that already had it.
+#ifndef LUMINA_CUMULONIMBUS_UNIFORM
+#define LUMINA_CUMULONIMBUS_UNIFORM
+	uniform float cumulonimbusStrength;
+#endif
+
 #if defined Daily_Weather
 	flat varying vec4 dailyWeatherParams0;
 	flat varying vec4 dailyWeatherParams1;
@@ -209,6 +221,43 @@ float cloudVol(int layer, in vec3 pos, in vec3 samplePos, in float cov, in int L
 	return cloud;
 }
 
+// Eclipse's cumulonimbus gate.
+//
+// Eclipse collapses the cloud profile toward an anvil shape while thunder is
+// active, written as
+//
+//     shape *= pow(cumulonimbusStrength, mix(1.0, 6.0,
+//                 smoothstep(tallness*0.75 + minHeight, maxHeight, position.y)));
+//
+// The exponent is the whole trick: it rises with height, so the gate barely
+// touches the cloud base and bites hard at the top. What is left is a wide flat
+// underside with a narrow column above it - an anvil - rather than a cumulus
+// blob. Going to 6 rather than 1 is what makes the top vanish instead of merely
+// thinning.
+//
+// Ported rather than copied, because this pack's cloud code is a different shape
+// entirely: Eclipse computes a `shape` term inside its own density function,
+// whereas here the density comes back out of cloudVol() as a single
+// already-eroded value. So the gate is applied on the way out instead.
+//
+// It goes HERE, at GetCumulusDensity, rather than inside cloudVol, for two
+// reasons. GetCumulusDensity is the one point every caller passes through,
+// including the four shadow-march call sites - so cloud shadows collapse with the
+// clouds casting them, which they would not if the gate lived in the volume
+// function and the shadow path never reached it. And it covers the LoD < 0 early
+// return below, which never reaches cloudVol at all and would otherwise keep the
+// old profile for distant clouds.
+//
+// cumulonimbusStrength is 1.0 when CUMULONIMBUS is off, and pow(x, 1.0) is the
+// identity, so the term costs nothing and disappears in the generated code.
+float cumulonimbusGate(in float posY, in float minHeight, in float maxHeight) {
+	// 0.75 matches Eclipse's tallness*0.75 + minHeight: the gate starts biting at
+	// three quarters of the layer's depth and reaches full strength at its top.
+	float heightBias = smoothstep(minHeight + (maxHeight - minHeight) * 0.75, maxHeight, posY);
+	float exponent = mix(1.0, 6.0, heightBias);
+	return pow(clamp(cumulonimbusStrength, 0.0, 1.0), exponent);
+}
+
 float GetCumulusDensity(int layer, in vec3 pos, in int LoD, float minHeight, float maxHeight){
 
 	vec3 samplePos =  pos*vec3(1.0,1./48.,1.0)/4;
@@ -217,8 +266,9 @@ float GetCumulusDensity(int layer, in vec3 pos, in int LoD, float minHeight, flo
 
 	// return coverageSP;
 	if (coverageSP > 0.001) {
-		if (LoD < 0) return max(coverageSP - 0.27*fbmAmount,0.0);
-		return cloudVol(layer, pos,samplePos,coverageSP,LoD	,minHeight, maxHeight) ;
+		float gate = cumulonimbusGate(pos.y, minHeight, maxHeight);
+		if (LoD < 0) return max(coverageSP - 0.27*fbmAmount,0.0) * gate;
+		return cloudVol(layer, pos,samplePos,coverageSP,LoD	,minHeight, maxHeight) * gate ;
 	} else return 0.0;
 }
 

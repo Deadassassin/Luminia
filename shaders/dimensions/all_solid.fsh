@@ -2,6 +2,7 @@
 
 #include "/lib/settings.glsl"
 #include "/lib/blocks.glsl"
+#include "/lib/material_reflectance.glsl"
 #include "/lib/entities.glsl"
 #include "/lib/items.glsl"
 
@@ -495,6 +496,40 @@ void main() {
 
 		SpecularTex.r = max(SpecularTex.r, rainfall);
 		SpecularTex.g = max(SpecularTex.g, max(Puddle_shape*0.02,0.02));
+
+		#ifdef LUMINA_MATERIAL_REFLECTANCE
+			// The block's own material, from lib/material_reflectance.glsl. Above,
+			// SpecularTex holds whatever the `specular` texture sampled, which is a
+			// single black pixel because nothing writes that texture ("4 read one
+			// pixel, because nothing fills them yet"), plus rain and puddles.
+			//
+			// max(), not assignment. Both channels can only go UP from the sample, and
+			// that is the right direction for both:
+			//
+			//   .r is smoothness, so rain (SpecularTex.r = max(..., rainfall)) making
+			//       a block wet makes it shinier, and the table is the dry value. A
+			//       downpour should still make every block in the world reflective,
+			//       exactly as it did in v0.4.2.
+			//   .g is F0, and the sample above can only have put a puddle's 0.02
+			//       there. max() with the table's value therefore replaces it, and the
+			//       0.02 puddle floor can never be what decides the channel.
+			//
+			// It has to be max and NOT min. An earlier version used
+			//     .r = min(SpecularTex.r, lpvMaterialSmoothness(id))
+			// which discarded the entire smoothness column for every block in the
+			// game: the placeholder pixel is black, min(0, anything) is 0, and every
+			// surface arrived at roughness 1.0. That is not a blend that let a
+			// resource pack win - it was a blend against a one-pixel constant.
+			//
+			// blockID is a flat varying read from mc_Entity.x in all_solid.vsh:235, so
+			// it is genuinely per-block here. Note that mc_Entity is absent from the
+			// entity mesh and the hand, where the engine substitutes a constant -
+			// which is why the hand is left alone rather than given a material that
+			// would be the same for every item held.
+			int matBlockId = int(blockID + 0.5);
+			SpecularTex.r = max(SpecularTex.r, lpvMaterialSmoothness(matBlockId));
+			SpecularTex.g = max(SpecularTex.g, lpvMaterialF0(matBlockId));
+		#endif
 
 		gl_FragData[1].rg = SpecularTex.rg;
 

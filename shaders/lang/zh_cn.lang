@@ -1,4 +1,4 @@
-profile.SHADER_VERSION_LABEL = Luminia
+profile.SHADER_VERSION_LABEL = Luminia v0.5b
 profile.LEGACY_TONEMAP = 旧版色调映射 (Hejl 2015)
 
 # if you're here to translate, this is a joke, these don't do what they say
@@ -406,6 +406,15 @@ screen.Climate = 气候
     option.SAND_STORMS = 沙尘暴
 
 screen.World = 世界
+    screen.Aurora = 极光
+        option.AURORA_CHANCE = 极光概率
+        suffix.AURORA_CHANCE = %
+        option.AURORA_MOON = 仅在月亮落下时
+        option.AURORA_GAIN = 极光强度
+        option.AURORA_BRIGHTNESS = 极光亮度
+        option.AURORA_R = 极光相位 R
+        option.AURORA_G = 极光相位 G
+        option.AURORA_B = 极光相位 B
     screen.Water = 水体设置
         option.WATER_REFLECTIONS = 水面高光反射
         option.SCREENSPACE_REFLECTIONS = 屏幕空间反射 (SSR)
@@ -475,6 +484,7 @@ screen.Resource_Pack_Support = 资源包支持
         option.Rough_reflections = 粗糙反射
         option.Sky_reflection = 天空/雾气反射
         option.Dynamic_SSR_quality = 动态 SSR 质量
+        option.LUMINA_MATERIAL_REFLECTANCE = 按方块的材质
         option.Roughness_Threshold = 粗糙反射阀值
         option.Sun_specular_Strength = 太阳反射强度
         option.reflection_quality = SSR 质量
@@ -597,6 +607,7 @@ screen.Resource_Pack_Support.comment = 由遵循 LabPBR 格式的资源包提供
         option.Dynamic_SSR_quality.comment = 会基于它们的可见程度降低屏幕空间反射质量. 以降低质量为代价提升性能. 
         option.Roughness_Threshold.comment = 粗糙度达到阈值后除了太阳反射外所有反射都不渲染. 可提升性能.
         option.Sun_specular_Strength.comment = 配置太阳反射亮度.
+        option.LUMINA_MATERIAL_REFLECTANCE.comment = 按方块 id 为每个方块指定自身的粗糙度与反射率，而不是读取 specular 贴图 —— 没有任何东西会写入它，所以不下雨时所有方块都是一样的哑光。需要上面的镜面反射。石英刻意不在表中，因此保持哑光。§a性能开销:§r 无
         option.reflection_quality.comment = 配置屏幕空间反射质量.
 
 screen.Subsurface_Scattering.comment = §b这是什么?§r 打个比方, 次表面散射类似于你把你的手盖住一个很亮的光源, 手掌呈现的那种从内部透光的感觉. 阳光实际上对植物, 衣服, 皮肤或者其它事物照耀都可以产生相同的效果.
@@ -650,6 +661,14 @@ screen.Clouds.comment = 配置和光线步进体积云相关的设置.
     option.Rain_coverage.comment = 配置雨天时云层的覆盖率.
 
 screen.World.comment = 配置多种会在主世界发生的效果, 从摇摆植物到水体相关的设置等.
+    screen.Aurora.comment = 夜空极光, 绘制在云层之后. 概率是指有多少比例的游戏内天数会出现极光, 一旦出现就会持续整晚. §a性能开销:§r 低, 仅夜间
+        option.AURORA_CHANCE.comment = 极光出现的天数百分比. 0 为完全关闭. 与生物群系无关 —— 与 Eclipse 不同, 后者只在雪地群系显示.
+        option.AURORA_MOON.comment = 仅在月亮位于地平线以下时显示极光.
+        option.AURORA_GAIN.comment = 极光的整体强度.
+        option.AURORA_BRIGHTNESS.comment = 效果内部的亮度, 在上面的强度之前应用.
+        option.AURORA_R.comment = 红色通道的相位偏移, 不是颜色. 这三个值让辉光沿光幕高度由绿过渡到品红. 三者相同会得到单色平涂, 这也是合理的效果. §a性能开销:§r 无
+        option.AURORA_G.comment = 绿色通道的相位偏移, 不是颜色. 参见极光相位 R. §a性能开销:§r 无
+        option.AURORA_B.comment = 蓝色通道的相位偏移, 不是颜色. 参见极光相位 R. §a性能开销:§r 无
     screen.Water.comment = 配置和水体相关的设置.
         option.WATER_REFLECTIONS.comment = 所有半透明方块反射的开关. 本选项允许以下其它设置启用. §a性能消耗水平:§r 低.
         option.SCREENSPACE_REFLECTIONS.comment = 半透明方块的屏幕空间反射开关. §a性能消耗水平:§r 中.

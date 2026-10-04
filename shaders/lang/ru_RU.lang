@@ -1,4 +1,4 @@
-profile.SHADER_VERSION_LABEL = Luminia
+profile.SHADER_VERSION_LABEL = Luminia v0.5b
 profile.LEGACY_TONEMAP = Hejl 2015 (старая обработка цвета)
 
 # Эти настройки не делают то, что заявлено
@@ -384,6 +384,15 @@ screen.Climate = Настройки климата
         option.DARKFOREST_B = Синий
 
 screen.World = Мир
+    screen.Aurora = Северное сияние
+        option.AURORA_CHANCE = Шанс сияния
+        suffix.AURORA_CHANCE = %
+        option.AURORA_MOON = Только когда луна за горизонтом
+        option.AURORA_GAIN = Сила сияния
+        option.AURORA_BRIGHTNESS = Яркость сияния
+        option.AURORA_R = Фаза R сияния
+        option.AURORA_G = Фаза G сияния
+        option.AURORA_B = Фаза B сияния
     screen.Water = Настройки воды
         option.WATER_REFLECTIONS = Зеркальные отражения воды
         option.SCREENSPACE_REFLECTIONS = Экранные отражения (SSR)
@@ -447,6 +456,7 @@ screen.Resource_Pack_Support = Поддержка наборов ресурсо�
         option.Rough_reflections = Детализированная шероховатость
         option.Sky_reflection = Отражения неба и тумана
         option.Dynamic_SSR_quality = Динамическое качество ЭО
+        option.LUMINA_MATERIAL_REFLECTANCE = Материалы по блокам
         option.Roughness_Threshold = Порог отражения
         option.Sun_specular_Strength = Множитель отражения солнца
         option.reflection_quality = Качество ЭО
@@ -569,6 +579,7 @@ screen.Resource_Pack_Support.comment = Эффекты, использующие 
         option.Dynamic_SSR_quality.comment = Динамическое снижение качества экранных отражений в зависимости от видимости. Улучшает производительность, но снижает качество.
         option.Roughness_Threshold.comment = Порог шероховатости, при котором отражения (кроме солнечных) отключаются. Улучшает производительность.
         option.Sun_specular_Strength.comment = Яркость солнечных бликов.
+        option.LUMINA_MATERIAL_REFLECTANCE.comment = Задаёт каждому блоку собственную шероховатость и отражаемость по его id, вместо чтения из текстуры specular - которую никто не заполняет, поэтому без дождя все блоки одинаково матовые. Требует Зеркальные отражения выше. Кварц намеренно отсутствует в таблице и остаётся матовым. §aСТОИМОСТЬ ПРОИЗВОДИТЕЛЬНОСТИ:§r нет
         option.reflection_quality.comment = Качество экранных отражений.
 
 screen.Subsurface_Scattering.comment = §bЧто это?§r Подповерхностное рассеивание (SSS) — эффект свечения при подсветке (например, рука под фонарём). Солнце создаёт аналогичный эффект на растениях, ткани, коже и т.д.
@@ -622,6 +633,14 @@ screen.Clouds.comment = Настройки объёмных облаков с т
     option.Rain_coverage.comment = Покрытие неба облаками во время дождя.
 
 screen.World.comment = Настройки мира: от колыхания растений до воды.
+    screen.Aurora.comment = Северное сияние на ночном небе, рисуется за облаками. Шанс — процент игровых дней, в которые сияние появляется, и тогда оно держится всю ночь. §aСТОИМОСТЬ ПРОИЗВОДИТЕЛЬНОСТИ:§r низкая, только ночью
+        option.AURORA_CHANCE.comment = Процент дней, в которые появляется сияние. 0 полностью отключает. Не зависит от биома — в отличие от Eclipse, где сияние только в снежных.
+        option.AURORA_MOON.comment = Показывать сияние только пока луна ниже горизонта.
+        option.AURORA_GAIN.comment = Общая сила сияния.
+        option.AURORA_BRIGHTNESS.comment = Яркость внутри эффекта, до силы выше.
+        option.AURORA_R.comment = Сдвиг фазы красного канала, а не цвет. Три значения проводят свечение от зелёного к мадженте вверх по занавесу. Одинаковые значения дают ровный однотонный цвет, и это допустимый вид. §aСТОИМОСТЬ ПРОИЗВОДИТЕЛЬНОСТИ:§r нет
+        option.AURORA_G.comment = Сдвиг фазы зелёного канала, а не цвет. См. Фаза R сияния. §aСТОИМОСТЬ ПРОИЗВОДИТЕЛЬНОСТИ:§r нет
+        option.AURORA_B.comment = Сдвиг фазы синего канала, а не цвет. См. Фаза R сияния. §aСТОИМОСТЬ ПРОИЗВОДИТЕЛЬНОСТИ:§r нет
     screen.Water.comment = Настройки воды.
         option.WATER_REFLECTIONS.comment = Отражения на прозрачных объектах. §aВЛИЯНИЕ НА ПРОИЗВОДИТЕЛЬНОСТЬ:§r низкое-высокое.
         option.SCREENSPACE_REFLECTIONS.comment = Экранные отражения на прозрачных объектах. §aВЛИЯНИЕ НА ПРОИЗВОДИТЕЛЬНОСТЬ:§r среднее.

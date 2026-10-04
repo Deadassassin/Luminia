@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate Luminia's pack.png.
+"""Generate FauxTracer's pack.png.
 
 A 128x128 icon: dark sky gradient, a starfield, an aurora ribbon and a low sun.
 Written with zlib + struct so the build has no third party dependencies.

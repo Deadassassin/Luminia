@@ -1,3 +1,18 @@
+// The nether's own biome environment.
+//
+// This file is included by deferred.fsh, composite2.fsh and
+// fogBehindTranslucent_pass.fsh, and only the first of those has
+// lib/climate_settings.glsl in scope by the time it gets here - the other two
+// reach it more directly. So the uniform is declared here, guarded by a macro,
+// rather than relying on an include order that is not the same in all three.
+// Redeclaring a uniform that is already in scope is legal GLSL as long as the
+// types agree, but the guard makes it unambiguous and keeps the three passes
+// compiling the same expression either way.
+#ifndef LUMINA_NETHER_FOG_UNIFORMS
+#define LUMINA_NETHER_FOG_UNIFORMS
+	uniform float isNether;
+#endif
+
 float densityAtPosFog(in vec3 pos){
 	pos /= 18.;
 	pos.xz *= 0.5;
@@ -63,7 +78,26 @@ vec4 GetVolumetricFog(
 	float absorbance = 1.0;
 
 	vec3 hazeColor = normalize(gl_Fog.color.rgb);
-
+	
+	// The nether biome environment, applied once outside the march.
+	//
+	// isNether is 1 in any nether biome and 0 everywhere else, so this whole block
+	// compiles away to nothing overworld without needing a dimension #ifdef - which
+	// matters, because the plume/haze/ceiling code below it is shared and this is
+	// the only nether-specific thing in it.
+	//
+	// NETHER_STORM_DENSITY scales the plume, haze and ceiling together, because in
+	// the nether they are all the same overcast: there is no weather to vary them
+	// independently. It is a density, so it multiplies; a value above 1 thickens
+	// the nether and can be pushed further than a colour can.
+	//
+	// The RGB is a TINT, not a replacement colour. It is multiplied into the plume
+	// lighting, so with the default of (1.0, 0.4, 0.2) left alone nothing changes -
+	// which is the point. Setting all three to 1.0 turns the nether's orange
+	// overcast grey and is the fastest way to see that this is wired up at all.
+	float netherDensity = mix(1.0, NETHER_STORM_DENSITY, isNether);
+	vec3 netherTint = mix(vec3(1.0), vec3(NETHER_STORM_R, NETHER_STORM_G, NETHER_STORM_B), isNether);
+	
 	#if defined LPV_VL_FOG_ILLUMINATION && defined EXCLUDE_WRITE_TO_LUT
     	float TorchBrightness_autoAdjust = mix(1.0, 30.0,  clamp(exp(-10.0*exposure),0.0,1.0)) / 5.0;
 	#endif
@@ -79,10 +113,13 @@ vec4 GetVolumetricFog(
 
 		//------ PLUME EFFECT
 			float plumeDensity = min(densityVol * pow(min(max(100.0-progressW.y,0.0)/30.0,1.0),4.0), pow(clamp(1.0 - length(progressW-cameraPosition)/far,0.0,1.0),5.0));
-			plumeDensity *= NETHER_PLUME_DENSITY;
+			plumeDensity *= NETHER_PLUME_DENSITY * netherDensity;
 			float plumeVolumeCoeff = exp(-plumeDensity*dd*dL);
 
-			vec3 lighting = vec3(1.0,0.4,0.2) * exp(-15.0*densityVol) * (clearArea*clearArea*0.9+0.1);
+			// The (1.0, 0.4, 0.2) is the nether's own overcast colour and is kept
+			// explicit rather than folded into netherTint, so that a pack setting the
+			// tint to white gets a NEUTRAL overcast and not the nether's orange one.
+			vec3 lighting = vec3(1.0,0.4,0.2) * netherTint * exp(-15.0*densityVol) * (clearArea*clearArea*0.9+0.1);
 
 			color += (lighting - lighting * plumeVolumeCoeff) * absorbance;
 			absorbance *= plumeVolumeCoeff;
@@ -91,19 +128,22 @@ vec4 GetVolumetricFog(
 			// dont make haze contrube to absorbance.
 			float hazeDensity = 0.001;
 			#ifndef ReflectedFog
-				hazeDensity *= NETHER_HAZE_DENSITY;
+				hazeDensity *= NETHER_HAZE_DENSITY * netherDensity;
 			#endif
 			float hazeVolumeCoeff = exp(-hazeDensity*dd*dL);
 			
-			vec3 hazeLighting = hazeColor;
+			vec3 hazeLighting = hazeColor * netherTint;
 			
 			color += (hazeLighting - hazeLighting*hazeVolumeCoeff) * absorbance;
 
 		//------ CEILING SMOKE EFFECT
 			float ceilingSmokeDensity = 0.001 * pow(min(max(progressW.y-40.0,0.0)/50.0,1.0),3.0);
-			ceilingSmokeDensity *= NETHER_CEILING_SMOKE_DENSITY;
+			ceilingSmokeDensity *= NETHER_CEILING_SMOKE_DENSITY * netherDensity;
 			float ceilingSmokeVolumeCoeff = exp(-ceilingSmokeDensity*dd*dL);
 			
+			// Left white rather than tinted. The ceiling is already a near-white
+			// overcast and it is what you see against, so tinting it toward the fog
+			// colour would just mute the whole sky without changing the fog.
 			vec3 ceilingSmoke = vec3(1.0);
 
 			color += (ceilingSmoke - ceilingSmoke*ceilingSmokeVolumeCoeff) * (absorbance*0.5+0.5);
