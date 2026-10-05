@@ -468,10 +468,11 @@ void main() {
 		// the blockID read in lib/material_reflectance.glsl.
 		#ifdef WORLD
 		if (blockID == BLOCK_LAVA) {
-			// The world-space Y of the face normal. The field is a function of
-			// world XZ, so it only means anything on a face you look down on, and
-			// lavaSurface() fades the pattern out on anything else.
-			float upness = smoothstep(0.25, 0.75, viewToWorld(normal).y);
+			// The face normal in world space. lavaSurface() needs all three
+			// components, not just the vertical one: a wall's projection is built
+			// from the horizontal part, because the field is a function of world
+			// XZ and that is very nearly a single point per column on a wall.
+			vec3 worldNormal = viewToWorld(normal);
 
 			// The LOD needs the world-space size of a pixel, and fwidth() is
 			// undefined inside non-uniform control flow - a quad straddling the
@@ -482,7 +483,8 @@ void main() {
 			// cheap log() that turns it into an octave count happens inside.
 			Albedo.rgb = lavaSurface(
 				worldpos,
-				upness,
+				worldNormal,
+				fwidth(worldpos.xz),
 				lavaOctaves(length(fwidth(worldpos.xz))),
 				frameTimeCounter * LAVA_SPEED
 			);

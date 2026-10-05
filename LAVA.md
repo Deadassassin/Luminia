@@ -7,11 +7,12 @@ On the settings screen under **Lava**:
 | Option | Default | What it does |
 | --- | --- | --- |
 | `LAVA` | on | The master switch. Off means the code is not compiled, not merely multiplied by zero. |
-| `LAVA_TILE` | 8.0 | How many blocks one unit of the source shader's uv spans. |
-| `LAVA_SPEED` | 1.0 | Animation rate. |
-| `LAVA_CRUST_LEVEL` | 0.70 | The contour the cracks sit on. Higher means more crust. |
-| `LAVA_CRACK_WIDTH` | 0.03 | Half-width of that contour, in field units. |
-| `LAVA_SEAM` | 0.65 | How much hotter a crack is than the melt around it. |
+| `LAVA_TILE` | 2.0 | How many blocks one unit of the source shader's uv spans. Sets plate size. |
+| `LAVA_SPEED` | 6.0 | Animation rate. |
+| `LAVA_CRUST_LEVEL` | 0.78 | The contour the cracks sit on. Higher means more crust. |
+| `LAVA_CRACK_WIDTH` | 0.05 | Half-width of that contour, **in blocks**. |
+| `LAVA_SEAM` | 0.45 | How much hotter a crack is than the melt around it. |
+| `LAVA_VARIATION` | 0.10 | How much the crust level drifts across a pool. |
 | `LAVA_GLOW` | 1.0 | Brightness lift on the whole surface. Also raises `EMISSIVE`. |
 
 ## The source
@@ -34,8 +35,8 @@ comes out is a monochrome orange plasma. Real lava is mostly dark cooled crust
 with a thin bright network between the plates, and that second half is the part
 that reads as lava rather than as a lava-textured orange.
 
-So the field is ported exactly and the crust is *derived* from it. A level set of
-the scalar is a contour line through the pattern, and a contour is what a crack
+So the field is ported as written and the crust is *derived* from it. A level set
+of the scalar is a contour line through the pattern, and a contour is what a crack
 between two crust plates is. Nothing is added to the field itself, so the swirl
 and the outward zoom are still the original's.
 
@@ -66,9 +67,113 @@ no shading normal in the G-buffer at all — so there is no displaced normal her
 to displace. Perturbing `normal` would change the GI and the path tracer's
 bounces and nothing else.
 
-So the lava is albedo and emission. That is also the honest way to do it:
-molten rock is a dark skin over an emitter, not a mirror. A sky reflection on a
-lava pool would be wrong in the way that a reflection on tar is wrong.
+So the lava is albedo and emission. That is also the honest way to do it: molten
+rock is a dark skin over an emitter, not a mirror. A sky reflection on a lava
+pool would be wrong in the way that a reflection on tar is wrong.
+
+## What it looked like before, and why
+
+The first working version was reported as looking like **poured gold**, with the
+sides of every pool a **flat untextured orange**. Both were bugs, and neither was
+the colour ramp, which is where they were assumed to be. Three separate faults,
+in increasing order of how much they mattered:
+
+### 1. The crack width was not a width
+
+The contour was thresholded in *field value* units:
+
+```glsl
+seam = 1 - smoothstep(0, 0.03, abs(h - level))
+```
+
+which looks like a width and is not one. The field's gradient is steep enough
+that a band half 0.03 units wide is a small fraction of a thousandth of a block.
+The entire melt gradient fitted inside a thousandth of a block, which is a hard
+binary edge. `tools/lava_render.py` confirmed it: **12.9% of the surface at heat
+exactly 1.0, and only 9.2% anywhere in between.** Every molten pixel came out the
+identical colour, which is a flat sheet of the top of the ramp — and a flat sheet
+of yellow-white is exactly what "poured gold" means.
+
+The fix is to divide the threshold by the local gradient, which turns a distance
+in field value into a distance in blocks. `LAVA_CRACK_WIDTH` is now an honest
+width in blocks, and needs two more evaluations of the field to get that
+gradient.
+
+The gradient is differenced over **one pixel**, taken from `fwidth()`. That is
+deliberate: it is the only step that is meaningful at this point, and it degrades
+the right way — at distance the step grows, the estimate becomes a low-pass, and
+distant cracks go soft and wide, which is what distance does to a crack.
+
+### 2. `fwidth()` has to leave the branch
+
+The LOD needs `fwidth(worldpos.xz)`, and derivatives are undefined inside
+non-uniform control flow. `blockID` is a `flat` varying, so
+`if (blockID == BLOCK_LAVA)` is uniform per primitive but **not** per quad — and
+a quad straddling the edge of a lava pool would read its neighbours' derivatives
+across that boundary, producing a ring of wrong octave counts along every
+shoreline.
+
+So the derivative is taken in `all_solid.fsh` outside the branch and only the
+`log()` that turns it into an octave count happens inside. This is why
+`lavaOctaves()` and `lavaSurface()` both take the pixel size as an argument
+instead of measuring it themselves.
+
+### 3. Non-up-facing faces were painted a flat colour
+
+```glsl
+col = mix(vec3(0.55, 0.10, 0.012), col, upness);   // the wrong fix
+```
+
+Any face not pointing up got a constant orange. That was an over-correction: the
+projection *is* wrong on a wall — world XZ is nearly a single point per column
+there, so every feature smears into a vertical streak — but the answer is to
+reproject, not to delete the detail.
+
+A wall now gets its own 2D basis: one axis along the wall, derived from the face
+normal so it works at any orientation, and one down it, compressed by
+`LAVA_WALL_STRETCH` so features come out taller than wide and a crack reads as a
+drip rather than a bead. Walls also run hotter, because a vertical face of molten
+rock does not crust the way a horizontal one does.
+
+## The frequency range is the thing that cannot be reasoned about
+
+The loop magnifies the domain by 1.5 per octave, so the source's sixteen passes
+span a **657:1** frequency range. A screen can show that: on Shadertoy the finest
+octave is about a pixel and a half across a 1000px image. A lava surface cannot.
+Plates are metres apart and cracks are centimetres — about 20:1 — so at 16
+octaves the pattern's structure lands at roughly **one millimetre** and every
+lava pool renders as an undifferentiated sheet.
+
+Measured plate spacing, one standard deviation of the field converted to blocks
+through the local gradient, against octave count:
+
+| octaves | 3 | 5 | 8 | 12 | 16 |
+| --- | --- | --- | --- | --- | --- |
+| `LAVA_TILE` 0.35 | 0.415 | 0.308 | 0.252 | 0.243 | 0.240 bl |
+| `LAVA_TILE` 1.50 | 0.078 | 0.045 | 0.022 | 0.015 | 0.014 bl |
+| `LAVA_TILE` 8.00 | 0.014 | 0.009 | 0.003 | 0.001 | 0.001 bl |
+
+Past about 8 the extra iterations stop adding structure and start adding
+aliasing: they are finer than the pixel. The contact sheet from
+`tools/lava_render.py` shows octave rows 10, 12 and 16 turning to speckle while
+rows 5 to 8 stay clean. **`LAVA_OCTAVES_MAX` is 8, not 16.** That keeps the
+source's self-similar structure and its motion, over the band a world surface can
+resolve.
+
+## `LAVA_TILE` is what decided the gold
+
+`LAVA_TILE` scales the pattern's world size while `LAVA_CRUST_LEVEL` fixes what
+fraction of it is molten — so a large `LAVA_TILE` makes the features bigger than
+the transition band, and the crust disappears into the melt. At the original
+8.0 there was **no crust at all**, which is the other half of why it looked like
+a poured metal sheet.
+
+Measured at the shipped `CRUST_LEVEL` and `VARIATION`, over a 12 block view:
+
+| `LAVA_TILE` | 1.0 | 1.5 | **2.0** | 3.0 | 4.0 |
+| --- | --- | --- | --- | --- | --- |
+| molten | 26% | 24% | **23%** | 16% | 11% |
+| dark crust | 50% | 56% | **58%** | 71% | 81% |
 
 ## The field is not normalised in the original, and that matters here
 
@@ -77,71 +182,48 @@ The source divides by 3 while summing 16 terms. Measured with
 of **4.98** and a minimum near 0.02.
 
 On Shadertoy that clips to white and looks fine. Here it would make
-`LAVA_CRUST_LEVEL` an unfalsifiable magic number, so the divisor is **8.0**,
-which centres the field at 0.504:
+`LAVA_CRUST_LEVEL` an unfalsifiable magic number, so `lib/lava.glsl` divides by
+`2 * sqrt(octaves)` instead, which centres the field at 0.504:
 
 | percentile | 5 | 25 | 50 | 75 | 95 |
 | --- | --- | --- | --- | --- | --- |
 | field | 0.177 | 0.333 | 0.472 | 0.642 | 0.939 |
 
-`LAVA_CRUST_LEVEL` is then a percentile rather than a guess. Measured molten
-fraction at `LAVA_TILE` 8:
+The `sqrt(octaves)` is not tidiness. **Fewer octaves is a smaller field** —
+measured standard deviation 0.110 at 4 octaves against 0.235 at 16 — so a fixed
+threshold would make distant lava fade toward black as it simplified, which reads
+as a bug rather than as level of detail. Lava pools are exactly where you look
+*into* the distance. A sum of partial-cancelling cosines grows like `sqrt(n)`,
+and the measurement bears that out: within 7% at 4 octaves, 2.5% at 8, under 1%
+past 12.
 
-| level | 0.50 | 0.60 | **0.70** | 0.80 | 0.90 |
-| --- | --- | --- | --- | --- | --- |
-| molten | 45% | 30% | **19%** | 11% | 6% |
+## Two scales, because one is not enough
 
-## The octave LOD, and why the divisor has a sqrt in it
+With a single octave band a lava pool is a uniform speckle at every distance:
+close up the veins are right but there are no big dark plates, and from across a
+cavern there is nothing but mottle. Real lava has both scales at once.
 
-The loop scales the domain by 1.5 every pass, so by the last octave the pattern
-is 1.5^16 = 657x finer than where it started. Measured half-period per octave, at
-`LAVA_TILE` 8:
+So `LAVA_VARIATION` runs a second, much lower frequency evaluation — 2 iterations
+on a quarter-scale domain, a quarter the cost of one full evaluation — and uses it
+to offset the crust level. Whole regions of a pool run crusty and whole regions
+run molten.
 
-| octave | 4 | 8 | 12 | 15 |
-| --- | --- | --- | --- | --- |
-| feature size | 4.96 bl | 0.98 bl | 0.19 bl | 0.057 bl |
+Its mean and standard deviation are measured, not assumed, and they are not 0.5
+and 1.0: `length()` of a short sum is biased low, and at 2 octaves the field
+averages **0.4441** with a standard deviation of **0.2019**. Centring on 0.5
+would have biased every pool toward one end of the crust range.
 
-The last three octaves are sub-voxel. Left alone on a lava surface they alias
-into crawling noise, so the iteration count is chosen per fragment from the
-world-space size of a pixel, which is Nyquist applied to that table:
+## Keeping the field's argument small
 
-```
-i <= log( LAVA_TILE * PI / (2 * px) ) / log(1.5)
-```
+The loop scales the domain by 1.5 eight times, so a coordinate 10000 blocks from
+the origin arrives at the cosines as ~6.6e6, where one float32 ulp is about 0.5.
+`sin()` of that argument has lost most of its low bits and the pattern quantises
+into blocks — fine at spawn, garbage at 10k.
 
-clamped to `[4, 16]`. Four is the floor because below it the field has lost its
-own structure — measured correlation against the full 16 octaves is 0.21 at four
-octaves, so the extra iterations would be buying noise, not detail.
-
-That creates a problem, and it is the non-obvious part of this file. **Fewer
-iterations is a smaller field.** Measured standard deviation:
-
-| octaves | 4 | 8 | 12 | 16 |
-| --- | --- | --- | --- | --- |
-| std | 0.110 | 0.162 | 0.202 | 0.235 |
-
-A fixed `LAVA_CRUST_LEVEL` would therefore make distant lava fade toward black as
-it simplified, which reads as a bug rather than as level of detail — lava pools
-are exactly where you look *into* the distance.
-
-So the field is divided by `2 * sqrt(octaves)` as well. A sum of partial-cancelling
-cosines grows like `sqrt(n)`, and the measurement bears that out: the fitted
-correction is within 7% at 4 octaves, 2.5% at 8, and under 1% past 12. One
-constant threshold then means the same crust coverage at every distance, which is
-the whole point of doing it this way.
-
-## `fwidth()` has to leave the branch
-
-The LOD needs `fwidth(worldpos.xz)`, and derivatives are undefined inside
-non-uniform control flow. `blockID` is a `flat` varying, so `if (blockID ==
-BLOCK_LAVA)` is uniform per primitive but **not** per quad — and a quad
-straddling the edge of a lava pool would read its neighbours' derivatives across
-that boundary, producing a ring of wrong octave counts along every shoreline.
-
-So the derivative is taken in `all_solid.fsh` outside the branch and only the
-`log()` that turns it into an octave count happens inside. This is why
-`lavaOctaves()` takes the pixel size as an argument instead of measuring it
-itself, and it is the kind of thing that is invisible until it is not.
+Input is wrapped at 8192, which keeps every evaluation near zero. The wrap is
+not a period of the field, so there is a real discontinuity at each multiple of
+8192 blocks, but the two sides of one are 16 km apart and you cannot see both
+from inside a 512 block draw distance.
 
 ## The emission ceiling is 0.95, not 1.0
 
@@ -153,42 +235,16 @@ if( Emission < 254.5/255.0) Lighting = mix(Lighting, Albedo * Emissive_Brightnes
 ```
 
 `EMISSIVE` is already 0.5 for lava — id 199 is inside the `[100, 300)` band at
-`all_solid.vsh:277`, so lava has been mildly emissive since before this file
-existed. `all_solid.vsh` raises it to at most **0.95**.
+`all_solid.vsh:277` — and `all_solid.vsh` raises it to at most **0.95**.
 
 A lava pool set to 1.0 would fall out of that branch and end up **less** bright,
-not more. The brightest setting is one step below the cutoff.
+not more. The brightest setting is one step below the cutoff, and no position on
+the `LAVA_GLOW` slider can cross it.
 
-`EMISSIVE` is a per-block value, so this lifts the pool as a whole. The
-per-pixel structure rides on the albedo instead, which is where the crack
-network lives. That is the division of labour, and it is forced by the G-buffer:
-`gl_FragData[1].a` is the only emission channel and it is written from a `flat`
-varying.
-
-## Known limits
-
-- **No flow direction.** The only motion is the source's own `x.x += t/64`,
-  which compounds to `t/64 * 1.5^i` because the domain is scaled each pass. So
-  the pattern appears to zoom outward, faster at the fine end: measured drift is
-  about 0.5 blocks/s at the coarse end and over 50 blocks/s at octave 15. It
-  reads as a lazy crawl, which is right for a cooling pool and wrong for an
-  active flow. Directional flow would need the block's flow vector, which this
-  engine does not hand to the shader.
-- **No heat haze.** Lava should shimmer the air above it. That wants a screen-
-  space distortion driven by a volumetric sample, and it belongs to
-  `composite`, not to a G-buffer pass.
-- **Crust is albedo, not a normal.** As above: no displaced normal to write.
-  The plates therefore have no relief and catch no specular, which is why
-  `LAVA_SEAM` matters so much — it is doing the work a normal would do.
-- **The lava bucket item is untouched.** `ITEM_LAVA_BUCKET` is 1016, in the item
-  band, and is drawn by a different pass.
-- **Not flow-direction aware.** A lava fall and a lava lake get the same
-  treatment; the up-facing test only separates them from the *sides* of a pool.
-- **Untested in game.** It compiles clean in all 250 programs with the player's
-  settings, with `LAVA` off, and with the profiles applied; the field's range,
-  distribution, drift and gradient are measured rather than assumed; and
-  `block.properties` was corrected so `flowing_lava` reaches id 199 — but nothing
-  here has been looked at.
+`EMISSIVE` is a per-block value, so this lifts the pool as a whole. The per-pixel
+structure rides on the albedo instead, which is where the crack network lives.
+That division of labour is forced by the G-buffer: `gl_FragData[1].a` is the only
+emission channel and it is written from a `flat` varying.
 
 ## `block.199` did not match flowing lava
 
@@ -208,3 +264,53 @@ block.199=minecraft:lava minecraft:flowing_lava
 Worth knowing that `lpv_blocks.glsl` already keyed its light-source colour off
 `BLOCK_LAVA`, so the GI has been treating a source block as a 15-range orange
 light while the lake around it emitted nothing of its own.
+
+## Looking at it without a GPU
+
+`tools/lava_render.py` renders the albedo offline and writes a PNG, and
+`--sheet` produces a contact sheet. This exists because the first version was
+shipped on the strength of reasoning about a colour ramp and came out looking
+like poured gold, which is not something an argument catches.
+
+It reads the `LAVA_*` values out of `settings.glsl` rather than taking them as
+arguments, so the preview cannot drift away from the pack.
+
+The check that matters is **G/R**, not "is it orange". Gold is high red *and*
+high green with almost no blue; lava is high red with green around 0.25. A
+surface whose median G/R is much above about 0.55 reads as metal no matter how
+orange it looks in isolation. At the shipped defaults it measures **0.255** on
+molten pixels. Two mistakes this file made and had to be told about:
+
+- The first version measured G/R over the whole surface, and 78% of that is
+  near-black crust where a channel ratio is meaningless. Dividing the crust's
+  0.010 by its 0.012 gives 0.83 — exactly gold's green ratio — so the check
+  reported a pass on a surface it was measuring rock on. It now measures molten
+  pixels only.
+- The wall half of the preview rendered as horizontal stripes, and the bug was
+  in the *preview*, not the shader: the harness built its wall grid with both
+  axes a function of `y`. Worth knowing before trusting a preview.
+
+## Known limits
+
+- **No flow direction.** The only motion is the source's own `x.x += t/64`,
+  which compounds to `t/64 * 1.5^i` because the domain is scaled each pass, then
+  scales by `LAVA_TILE` to reach blocks. At the shipped defaults the coarsest
+  octave drifts 0.19 blocks/s and the finest 1.1 — a lazy creep, which is right
+  for a cooling pool and wrong for an active flow. Directional flow would need
+  the block's flow vector, which this engine does not hand to the shader.
+- **No heat haze.** Lava should shimmer the air above it. That wants a
+  screen-space distortion driven by a volumetric sample, and it belongs to
+  `composite`, not to a G-buffer pass.
+- **Crust is albedo, not a normal.** As above: no displaced normal to write. The
+  plates therefore have no relief and catch no specular, which is why
+  `LAVA_SEAM` and `LAVA_VARIATION` matter so much — between them they are doing
+  the work a normal would do.
+- **The lava bucket item is untouched.** `ITEM_LAVA_BUCKET` is 1016, in the item
+  band, and is drawn by a different pass.
+- **The wall projection is a compromise.** One scalar width for two axes of
+  different scale, taken as their geometric mean. Being 30% off on the vertical
+  axis of a wall is invisible.
+- **Tuned, not play-tested.** The constants are measured and the look was
+  confirmed on rendered albedo, but `EMISSIVE`, bloom and the deferred lighting
+  are not in that render — how a pool sits against a dark cave is the part
+  still unverified, and the tonemap in the preview is only this pack's.

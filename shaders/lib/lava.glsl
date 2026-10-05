@@ -68,10 +68,32 @@
 
 #ifdef LAVA
 
-// 16 is the original's count. It is a #define and not a literal so the loop
-// bound is a compile-time constant and the compiler can unroll; `octaves` is the
-// runtime LOD and only ever breaks the loop earlier.
-#define LAVA_OCTAVES_MAX 16
+// 8, and not the original's 16.
+//
+// The loop magnifies the domain by 1.5 per pass, so 16 passes is a 657:1
+// frequency range. A screen can show that: on Shadertoy the finest octave is
+// about a pixel and half across a 1000px image. A lava surface cannot - plates
+// are metres apart and cracks are centimetres, which is a range of about 20:1 -
+// so at 16 octaves the pattern's structure lands at roughly one millimetre and
+// every lava pool renders as an undifferentiated sheet. Measured plate spacing
+// (one standard deviation of the field, converted to blocks through the local
+// gradient) against octave count, at a 0.04 block pixel:
+//
+//     octaves        3      5      8     12     16
+//     TILE 0.35   0.415  0.308  0.252  0.243  0.240 blocks
+//     TILE 1.50   0.078  0.045  0.022  0.015  0.014 blocks
+//     TILE 8.00   0.014  0.009  0.003  0.001  0.001 blocks
+//
+// Past about 8 the extra iterations stop adding structure and start adding
+// aliasing: the octaves are finer than the pixel, and the contact sheet in
+// tools/lava_render.py --sheet shows rows 10, 12 and 16 turning to speckle while
+// rows 5 to 8 stay clean. Eight keeps the source's self-similar structure and
+// its motion, over the band a world surface can actually resolve.
+//
+// It is a #define and not a literal so the loop bound is a compile-time constant
+// and the compiler can unroll; `octaves` is the runtime LOD and only ever breaks
+// the loop earlier.
+#define LAVA_OCTAVES_MAX 8
 
 // The rotation in the original is mat2(cos(x), -sin(x), sin(x), cos(x)) with
 // x = 1. GLSL fills a matrix from its *columns*, so that constructor is
@@ -135,80 +157,227 @@ float lavaHeatMagnitude(vec2 x, float t, int octaves) {
 //
 //     i <= log( LAVA_TILE * LAVA_PI / (2 * px) ) / log(1.5)
 //
-// with px the world-space size of a pixel. Clamped to [4, 16]: below 4 the
-// pattern has lost its own structure (measured r against the full field is 0.21
-// at 4 octaves) and there is no point spending iterations on it.
+// with px the world-space size of a pixel. Clamped to [3, LAVA_OCTAVES_MAX]: below
+// 3 the pattern has lost its own structure (measured r against the full field is
+// 0.21 at 4 octaves) and there is no point spending iterations on it.
 //
 // px must be measured in uniform control flow. See the call site in
 // all_solid.fsh for why that is done outside the lava branch rather than here.
 int lavaOctaves(float px) {
 	float want = log(max(LAVA_TILE * LAVA_PI / max(2.0 * px, 1e-6), 1.001)) / log(1.5);
-	return clamp(int(floor(want)) + 1, 4, LAVA_OCTAVES_MAX);
+	return clamp(int(floor(want)) + 1, 3, LAVA_OCTAVES_MAX);
+}
+
+// lavaWrap - keep the field's argument small.
+//
+// The loop multiplies the domain by 1.5 sixteen times, so a coordinate 10000
+// blocks from the origin arrives at the cosines as ~6.6e6, where one float32 ulp
+// is about 0.5. sin() of that argument has lost most of its low bits and the
+// pattern quantises into blocks - fine at spawn, garbage at 10k.
+//
+// Wrapping the input at 8192 fixes it: every evaluation stays near zero. The
+// wrap is not a period of the field, so there is a real discontinuity at each
+// multiple of 8192 blocks, but the two sides of one are 16 km apart and you
+// cannot see both from inside a 512 block draw distance. This is the same
+// origin-wrapping that lib/waterBump.glsl's callers rely on for the same
+// reason.
+#define LAVA_WRAP 8192.0
+
+vec2 lavaWrap(vec2 p) {
+	return mod(p, LAVA_WRAP) - LAVA_WRAP * 0.5;
 }
 
 // lavaRamp - the heat scale. Stops are (heat, linear rgb).
 //
-// Lava's colour comes from blackbody radiation, which runs dark red through
-// orange to yellow-white, so the ramp is monotonic in all three channels and
-// only the *rate* changes: red is high almost immediately, blue only arrives at
-// the top. That is what makes the seams read as hotter rather than merely
-// brighter, and it is why this is a ramp and not a hue rotation.
+// Lava's colour is blackbody radiation, so the ramp is monotonic in red and the
+// other two channels arrive late and unequally: green climbs, blue barely
+// moves. That is why this is a ramp and not a hue rotation - a hue rotation
+// would swing through yellow and green on the way up, which is not a thing
+// molten rock does.
+//
+// **Blue is capped low on purpose.** The first version of this ramp topped out at
+// (1.0, 0.88, 0.56) - yellow-white - and the result read as poured gold rather
+// than as lava, because high green *and* high blue is what gold is. Real lava
+// only goes yellow-white in the white-hot centre of an active vent, and even
+// then it is a small part of the surface. Blue now reaches 0.17 at the very top
+// and green 0.62, which keeps the hue red-orange across the whole range.
 //
 // The values are linear, not sRGB, because Albedo in this pass is linear - see
 // the toLinear() on the read side in composite1.fsh.
 vec3 lavaRamp(float heat) {
-	vec3 c = vec3(0.020, 0.014, 0.012);   // cold crust, faintly warm grey
-	c = mix(c, vec3(0.140, 0.021, 0.004), smoothstep(0.00, 0.30, heat));
-	c = mix(c, vec3(0.520, 0.098, 0.008), smoothstep(0.25, 0.55, heat));
-	c = mix(c, vec3(0.980, 0.330, 0.030), smoothstep(0.50, 0.75, heat));
-	c = mix(c, vec3(1.000, 0.620, 0.150), smoothstep(0.70, 0.90, heat));
-	c = mix(c, vec3(1.000, 0.880, 0.560), smoothstep(0.86, 1.00, heat));
+	vec3 c = vec3(0.012, 0.010, 0.009);   // cold crust, near black
+	c = mix(c, vec3(0.090, 0.014, 0.003), smoothstep(0.00, 0.42, heat));
+	c = mix(c, vec3(0.420, 0.070, 0.006), smoothstep(0.38, 0.62, heat));
+	c = mix(c, vec3(0.850, 0.190, 0.016), smoothstep(0.58, 0.80, heat));
+	c = mix(c, vec3(1.000, 0.380, 0.045), smoothstep(0.76, 0.93, heat));
+	c = mix(c, vec3(1.000, 0.620, 0.170), smoothstep(0.90, 1.00, heat));
 	return c;
 }
 
+// lavaWallProjection - field coordinates for a vertical face.
+//
+// The field is a function of world XZ, which on a wall is very nearly a single
+// point per column, so projecting the world-XZ field onto a side face smears
+// every feature into a vertical streak. A wall needs its own 2D basis: one axis
+// running along the wall, and one running down it.
+//
+// along comes from the face normal, so it is correct for any wall orientation
+// rather than only the axis-aligned ones. The vertical axis is compressed by
+// LAVA_WALL_STRETCH so features come out taller than they are wide, which is
+// what makes a crack down a wall read as a drip instead of as a bead.
+#define LAVA_WALL_STRETCH 0.5
+
+vec2 lavaWallProjection(vec3 worldPos, vec3 worldNormal) {
+	vec2 n = worldNormal.xz;
+	float len = length(n);
+
+	// A degenerate horizontal normal is a floor or ceiling face, where this is
+	// never reached. Guarded anyway so the divide cannot produce a NaN that
+	// would then be sampled as a coordinate.
+	vec2 along = (len > 1e-4) ? vec2(-n.y, n.x) / len : vec2(1.0, 0.0);
+
+	return lavaWrap(vec2(dot(worldPos.xz, along), worldPos.y * LAVA_WALL_STRETCH)) / LAVA_TILE;
+}
+
+// lavaBlocksPerFieldUnit - how many world blocks one field unit spans, in
+// whichever projection is in use.
+//
+// Named for the direction of the conversion on purpose. `grad` below comes out
+// of a finite difference in field coordinates, so it is in *h units per field
+// unit*, and turning a field-unit distance into a block distance means
+// multiplying by this - not by its reciprocal. The first version of this file
+// had the reciprocal, named `lavaFieldUnitsPerBlock`, which is a name that reads
+// correctly and inverts the arithmetic: the whole melt gradient came out 64x
+// too narrow and lavaSurface() returned a flat constant for every pixel.
+//
+// On a top face the answer is LAVA_TILE on both axes. On a wall the axis along
+// the wall is LAVA_TILE but the vertical axis is stretched by
+// LAVA_WALL_STRETCH, so it is LAVA_TILE/0.5; this returns the geometric mean of
+// the two for a wall, which is the right compromise for a single scalar. The
+// crack width is an artistic control, not something being simulated - being 30%
+// off on one axis of a wall is invisible, where being 64x off is the whole
+// surface.
+float lavaBlocksPerFieldUnit(float upness) {
+	return mix(LAVA_TILE * sqrt(LAVA_WALL_STRETCH), LAVA_TILE, upness);
+}
+
+// lavaCoarse - a second, much lower frequency evaluation of the same field,
+// used to vary how molten a region is.
+//
+// Without it the field's own structure is the only scale on show, and a lava
+// pool is a uniform speckle at every distance: close up the veins are right but
+// there are no big dark plates, and from across a cavern there is nothing but
+// mottle. Real lava has both scales at once - metre-wide plates with hairline
+// channels between them - and one octave band cannot supply both.
+//
+// Two iterations on a quarter-scale domain, so it costs a quarter of one full
+// evaluation. 2 octaves rather than 1 because a single octave's magnitude is
+// nearly smooth; 2 is the point where it still looks like a field.
+//
+// The mean and standard deviation below are measured, not assumed, and they are
+// not 0.5 and 1.0. length() of a short sum is biased low - at 2 octaves the
+// field averages 0.4441, not 0.5 - so centring on the wrong number would bias
+// every pool toward one end of the crust range.
+#define LAVA_COARSE_OCTAVES 2
+#define LAVA_COARSE_MEAN 0.4441
+#define LAVA_COARSE_STD 0.2019
+
 // lavaSurface - the whole thing, for one lava fragment.
 //
-// worldPos is the world position, upness is the world-space Y of the face
-// normal (1 flat, 0 vertical), octaves is from lavaOctaves().
+// worldPos is the world position, worldNormal is the world-space face normal,
+// px is fwidth(worldPos.xz) - the world-space size of this pixel - and octaves
+// is from lavaOctaves().
 //
 // Returns the linear albedo. Emission is not handled here: see LAVA.md for why
 // the glow rides on this colour rather than on a separate channel.
-vec3 lavaSurface(vec3 worldPos, float upness, int octaves, float t) {
-	vec2 p = worldPos.xz / LAVA_TILE;
+vec3 lavaSurface(vec3 worldPos, vec3 worldNormal, vec2 px, int octaves, float t) {
+	// How much this face is looked down on. The band is wide and starts low
+	// because flowing lava's surface is *tilted* along the flow vector - a
+	// level-2 face is nowhere near vertical but it is also nowhere near flat,
+	// and a narrow band here would put half of every flowing pool on the wall
+	// projection and give it visible seams where the two meet.
+	float upness = smoothstep(0.15, 0.55, worldNormal.y);
+
+	vec2 flatP = lavaWrap(worldPos.xz) / LAVA_TILE;
+	vec2 wallP = lavaWallProjection(worldPos, worldNormal);
+	vec2 p = mix(wallP, flatP, upness);
 
 	// The original's only motion is x.x += t/64 inside the scaled loop, so the
 	// drift compounds to t/64 * 1.5^i and the pattern appears to zoom outward.
 	// That is the whole animation and it is kept; LAVA_SPEED scales t.
 	float h = lavaHeatMagnitude(p, t, octaves);
 
-	// The contour is the crack network. |h - level| is a distance in field
-	// units, so the band is thin where the field is steep and wide where it is
-	// flat - which is what a crack does: it widens where the crust is thin.
-	float level = LAVA_CRUST_LEVEL;
-	float seam = 1.0 - smoothstep(0.0, LAVA_CRACK_WIDTH, abs(h - level));
+	// ---------------------------------------------------------------------
+	// THE CRACK WIDTH IS IN BLOCKS, AND THAT IS THE WHOLE FIX
+	// ---------------------------------------------------------------------
+	//
+	// The first version thresholded the contour in *field value* units:
+	//
+	//     seam = 1 - smoothstep(0, 0.03, abs(h - level))
+	//
+	// which looks like a width and is not one. The field's gradient is steep
+	// enough that a band half 0.03 units wide is a small fraction of a
+	// thousandth of a block. The whole melt gradient fitted inside a thousandth
+	// of a block, which is a hard binary edge, and the renderer confirmed it:
+	// 12.9% of the surface at heat exactly 1.0 and only 9.2% anywhere in
+	// between. Every molten pixel came out the same colour, which is a flat
+	// sheet of the top of the ramp - and a flat sheet of yellow-white is what
+	// "poured gold" turned out to mean.
+	//
+	// So the threshold is divided by the local gradient, which turns a distance
+	// in field value into a distance in blocks, and LAVA_CRACK_WIDTH becomes
+	// what it always read as: a width in blocks.
+	//
+	// The gradient is two more evaluations of the field, differenced over one
+	// pixel. Differencing over px rather than over an arbitrary epsilon is
+	// deliberate: it is the only step that is meaningful at this point, and it
+	// degrades the right way - at distance the step grows, the estimate turns
+	// into a low-pass, and distant cracks go soft and wide, which is what
+	// distance does to a crack.
+	//
+	// step is in field units, so grad comes out in h units per field unit.
+	float step = max(length(px) / lavaBlocksPerFieldUnit(upness), 1e-5);
+	float hx = lavaHeatMagnitude(p + vec2(step, 0.0), t, octaves);
+	float hz = lavaHeatMagnitude(p + vec2(0.0, step), t, octaves);
+	float grad = max(length(vec2(hx - h, hz - h)) / step, 1e-5);
 
-	// Molten area, either side of the same contour. Below the level is crust.
-	float heat = smoothstep(level - LAVA_CRACK_WIDTH * 2.0,
-	                        level + LAVA_CRACK_WIDTH * 2.0, h);
+	// The contour, offset by the coarse field so that whole regions of a pool
+	// run crusty and whole regions run molten.
+	float coarse = (lavaHeatMagnitude(p * 0.25, t * 0.6, LAVA_COARSE_OCTAVES)
+	                - LAVA_COARSE_MEAN) / LAVA_COARSE_STD;
+	float level = LAVA_CRUST_LEVEL + coarse * LAVA_VARIATION;
+
+	// Signed distance to the contour, in blocks. Positive is the molten side.
+	// (h - level) / grad is a distance in field units, hence the multiply.
+	float dist = (h - level) / grad * lavaBlocksPerFieldUnit(upness);
+
+	// The contour is the crack network: a thin bright line on the level set, and
+	// melt on the far side of it.
+	float seam = 1.0 - smoothstep(0.0, LAVA_CRACK_WIDTH, abs(dist));
+	float heat = smoothstep(-LAVA_CRACK_WIDTH * 2.0, LAVA_CRACK_WIDTH * 2.0, dist);
 
 	vec3 col = lavaRamp(heat);
 
 	// The seam is hotter than the melt around it - it is an open vent, not more
 	// of the same thing - so it is taken up the ramp rather than added, which
-	// would clip to white and lose the gradient.
-	col = mix(col, lavaRamp(min(heat + 0.45, 1.0)), seam * LAVA_SEAM);
+	// would clip to white and lose the gradient. The push is 0.32 and not more
+	// because every unit of it lands nearer the top of the ramp, which is the
+	// part of the ramp that decides whether this reads as lava or as gold.
+	col = mix(col, lavaRamp(min(heat + 0.32, 1.0)), seam * LAVA_SEAM);
 
 	// Crust plates need tonal variation or they read as flat paper. h still
 	// varies smoothly across the region below the contour, so h/level is a free
-	// variation across each plate - no second evaluation, no texture fetch, and
+	// variation across each plate - no extra evaluation, no texture fetch, and
 	// guaranteed to agree with the pattern it sits on rather than being an
 	// unrelated noise field laid over the top.
-	col *= mix(0.7 + 0.6 * (h / max(level, 1e-4)), 1.0, heat);
+	col *= mix(0.75 + 0.5 * (h / max(level, 1e-4)), 1.0, heat);
 
-	// A side face is not looked down on, so the world-XZ projection is
-	// meaningless there and would smear. Fade the pattern out and leave a flat
-	// hot surface, which is what the side of a lava fall actually looks like.
-	col = mix(vec3(0.55, 0.10, 0.012), col, upness);
+	// A vertical face of molten rock does not crust the way a horizontal one
+	// does - it is still flowing off the wall - so walls run hotter and carry
+	// less crust. This replaces what used to be a flat colour on any non-up
+	// facing face, which was the wrong fix: it removed the detail instead of
+	// reprojecting it, and left the sides of every pool as flat orange.
+	col = mix(col, lavaRamp(min(heat + 0.28, 1.0)), (1.0 - upness) * 0.6);
 
 	// LAVA_GLOW is a lift on the whole surface, not on the seams alone: a lava
 	// pool lights the room, and the crust is what you see of it.

@@ -67,45 +67,98 @@
 #define LAVA
 
 // TILE is how many blocks one unit of the Shadertoy's uv spans. The original
-// spans one screen, so this is the only thing tying the pattern to the world.
-// Measured at TILE=8: the coarsest octave is a 25 block swirl and the level
-// that leaves 19% of the surface molten drifts at about 0.5 blocks/s.
-#define LAVA_TILE 8.0 // [2.0 3.0 4.0 6.0 8.0 12.0 16.0 24.0 32.0]
+// spans one screen, so this is the only thing tying the pattern to the world -
+// and it turned out to be the setting that decided whether this looked like lava.
+//
+// At 8.0 it produced a smooth sheet with no crust at all, which is what "liquid
+// gold" turned out to mean. The reason is that TILE scales the pattern's world
+// size while LAVA_CRUST_LEVEL fixes what fraction of it is molten, so a large
+// TILE makes the features bigger than the transition band and the crust
+// disappears into the melt.
+//
+// Measured at the current CRUST_LEVEL and VARIATION over a 12 block view. The
+// numbers the first version of this comment quoted were taken at CRUST_LEVEL
+// 0.70 before VARIATION existed, and overstated the problem because nothing was
+// compensating for it:
+//
+//     TILE      1.0    1.5    2.0    3.0    4.0
+//     molten    26%    24%    23%    16%    11%
+//     dark      50%    56%    58%    71%    81%
+//
+// VARIATION is what keeps molten coverage roughly flat across that range now, so
+// TILE is free to do its real job, which is to set how big the plates are. 2.0
+// is where the contact sheet shows plates that read as plates, with bright
+// channels between them; below 1.5 it is speckle, above 3 it goes mostly solid.
+#define LAVA_TILE 2.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0]
 
 // SPEED scales the animation. The original adds t/64 inside a loop that scales
-// the domain by 1.5 per pass, so the drift compounds to t/64 * 1.5^i: slow at
-// the coarse end and very fast at the fine end. 1.0 is the original's rate and
-// reads as a lazy crawl. There is no separate drift control because the
-// original has only the one.
-#define LAVA_SPEED 1.0 // [0.0 0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
+// the domain by 1.5 per pass, so the drift compounds to t/64 * 1.5^i and is then
+// scaled by TILE to get blocks. At TILE=1.5 that is 0.023 blocks/s at the
+// coarsest octave and 0.18 at the finest - a crawl, because the world is so much
+// bigger than the screen the original was drawn on. 6.0 puts the finest octave
+// at about 1.1 blocks/s and the coarsest at 0.14, which is the lazy drift that
+// cooling crust actually has.
+#define LAVA_SPEED 6.0 // [0.0 1.0 2.0 4.0 6.0 9.0 13.0 18.0 25.0 35.0]
 
 // CRUST_LEVEL is the contour the cracks sit on, and the only number here that
 // is a percentile of the field's distribution rather than a taste judgement.
-// Raising it means more crust. Measured fractions of the surface that end up
-// molten, at TILE=8:
+// Raising it means more crust. Measured at TILE=1.5, which is the setting that
+// matters for these numbers:
 //
-//     0.45 -> 54%      0.60 -> 30%      0.75 -> 15%
-//     0.50 -> 45%      0.65 -> 24%      0.80 -> 11%
-//                   0.70 -> 19%  <- default
+//     level     0.65    0.70    0.75    0.78    0.85    0.90
+//     molten    22%     17%     13%     11%      7%      5%
+//     crust     22%     27%     33%     36%     44%     49%
+//     field     p78     p83     p87     p90     p93     p96
 //
-// p50 of the field is 0.472 and p75 is 0.642, so 0.70 sits between them and
-// leaves roughly a fifth of a pool molten, which is about what cooling lava
-// looks like from above.
-#define LAVA_CRUST_LEVEL 0.70 // [0.40 0.45 0.50 0.55 0.60 0.65 0.70 0.75 0.80 0.85 0.90 1.00 1.10]
+// 0.78 leaves a pool about a tenth molten, which is about right: cooling lava is
+// mostly crust with bright channels running through it, not the other way round.
+// At 0.70 the pool is a third melt and stops reading as crust at all.
+//
+// Note these percentages are with VARIATION at 0. VARIATION moves the effective
+// level around underneath this one, so with it on the coverage at any given
+// point in a pool is lower than the table says in the open patches and higher in
+// the crusty ones - which is the point of it.
+#define LAVA_CRUST_LEVEL 0.78 // [0.50 0.60 0.65 0.70 0.74 0.78 0.82 0.86 0.90 0.95 1.05]
 
-// CRACK_WIDTH is the half-width of that contour, in field units. At TILE=8 the
-// measured median |grad h| is 5.2 per block at 8 octaves and 15.4 at 16, so
-// 0.03 is a crack roughly 0.01 to 0.02 blocks across at full detail and about
-// six times that once the LOD has dropped the fine octaves. That range is
-// deliberate - it is what a crack does - but 0.0 is not a useful setting, it
-// just erases the network.
-#define LAVA_CRACK_WIDTH 0.03 // [0.005 0.01 0.02 0.03 0.04 0.06 0.08 0.12 0.16 0.24]
+// CRACK_WIDTH is the half-width of that contour, **in blocks** - about how wide
+// a glowing crack between two crust plates is. The melt gradient either side of
+// it spans twice this.
+//
+// This was 0.03 in field-value units in the first version, which was not a width
+// at all: the field's gradient is steep enough that 0.03 units was under a
+// thousandth of a block, so the entire gradient fitted inside a thousandth of a
+// block and every molten pixel came out one identical colour. lib/lava.glsl now
+// divides the threshold by the local gradient, which makes this an honest
+// distance in blocks.
+//
+// 0.05 is a real crack - five centimetres. Below about 0.02 the network
+// dissolves into speckle; above about 0.2 the plates merge into one molten sheet
+// again.
+#define LAVA_CRACK_WIDTH 0.05 // [0.01 0.02 0.03 0.05 0.07 0.1 0.15 0.2 0.3 0.45]
 
 // SEAM is how far the crack is taken up the heat ramp past the melt around it.
 // 0 makes the seams the same temperature as the pools they divide, which reads
-// as orange paint. 1 makes them the hottest thing on the surface, which reads
-// as lava. 0.65 is the point where they are clearly hotter without going white.
-#define LAVA_SEAM 0.65 // [0.0 0.2 0.4 0.65 0.8 1.0]
+// as orange paint. 1 makes them the hottest thing on the surface.
+//
+// Turned down from 0.65 to 0.45 after looking at it in game: at 0.65 with the
+// old ramp's 0.45 push, seams reached the yellow-white top stop over a wide area
+// and a lava pool came out looking like poured gold. The ramp is what fixed
+// that, but SEAM is what pushes pixels into the top of it, so it came down too.
+// 0.45 keeps the seams clearly hotter than the melt without dominating the hue.
+#define LAVA_SEAM 0.45 // [0.0 0.15 0.3 0.45 0.6 0.8 1.0]
+
+// VARIATION is how much the crust level itself drifts across a pool, from a
+// second low-frequency evaluation of the same field. It is what gives a lava
+// lake big dark plates with narrow bright channels, rather than one uniform
+// speckle at every distance - the main field supplies the channels and this
+// supplies the plates.
+//
+// Measured against CRUST_LEVEL, so the two together set how much of a pool is
+// molten anywhere: at VARIATION 0.10 the effective level runs roughly 0.68 to
+// 0.88 across a pool, which is about 20% molten in the crusty patches down to
+// 6% in the open ones. 0.0 is a uniform speckle; above about 0.25 the patches
+// get so extreme that whole areas go flat black or flat molten.
+#define LAVA_VARIATION 0.10 // [0.0 0.04 0.07 0.1 0.15 0.2 0.3]
 
 // GLOW is a brightness lift on the whole surface. It is a multiplier on the
 // albedo and nothing else - it does not touch emission, which is EMISSIVE and

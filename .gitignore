@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+
+# tools/lava_render.py writes its preview here by default.
+tools/lava_preview.png
