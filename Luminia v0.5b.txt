@@ -1,0 +1,10 @@
+# Written by Vitrail's settings screen and by Iris, one NAME=value per line.
+# Only what differs from the pack's own defaults.
+# vitrail/options.txt is a different file, it is never written here, and it wins.
+RAY_COUNT=8
+ambientOcclusionLevel=0.23
+LARGE_WAVE_DISPLACEMENT=false
+POM=true
+POM_DEPTH=0.75
+MAX_DIST=50.0
+Horrible_slope_normals=true
