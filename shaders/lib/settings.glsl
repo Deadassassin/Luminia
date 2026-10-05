@@ -91,14 +91,25 @@
 // channels between them; below 1.5 it is speckle, above 3 it goes mostly solid.
 #define LAVA_TILE 2.0 // [0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0 6.0 8.0]
 
-// SPEED scales the animation. The original adds t/64 inside a loop that scales
-// the domain by 1.5 per pass, so the drift compounds to t/64 * 1.5^i and is then
-// scaled by TILE to get blocks. At TILE=1.5 that is 0.023 blocks/s at the
-// coarsest octave and 0.18 at the finest - a crawl, because the world is so much
-// bigger than the screen the original was drawn on. 6.0 puts the finest octave
-// at about 1.1 blocks/s and the coarsest at 0.14, which is the lazy drift that
-// cooling crust actually has.
-#define LAVA_SPEED 6.0 // [0.0 1.0 2.0 4.0 6.0 9.0 13.0 18.0 25.0 35.0]
+// SPEED scales the animation. 1.0 is the source's own rate, and at the original
+// LAVA_TILE of 8 it was fine; at the shipped TILE of 2 the features are six
+// times larger in world space, so the same rate is six times more visible and
+// 1.0 came out as a shimmer.
+//
+// The number that actually predicts shimmer is not a drift velocity but how much
+// of the field changes in one frame - most of this shader's time dependence is
+// modulation rather than translation, because the t*i term sits inside a nested
+// cos, so a drift measurement barely moves with SPEED while the flicker moves
+// linearly with it. Measured as a fraction of the field's own standard
+// deviation, at 60 fps and the shipped TILE and octave count:
+//
+//     SPEED    0.25    0.5     1.0     1.5     3.0     6.0
+//     change   1.6%    3.1%    6.3%    9.4%   18.5%   35.7%
+//
+// It is linear in SPEED, so the slider is evenly spaced in perception. 0.5 is
+// about 3% a frame: a drift you can follow across the crust, which is what
+// cooling lava does. Past about 2 it stops reading as flow.
+#define LAVA_SPEED 0.5 // [0.0 0.1 0.2 0.35 0.5 0.75 1.0 1.5 2.0 3.0 5.0]
 
 // CRUST_LEVEL is the contour the cracks sit on, and the only number here that
 // is a percentile of the field's distribution rather than a taste judgement.

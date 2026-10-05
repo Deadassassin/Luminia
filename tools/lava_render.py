@@ -284,8 +284,22 @@ def main():
     ap.add_argument("--octaves", type=int, default=OCTAVES_MAX)
     ap.add_argument("--t", type=float, default=0.0)
     ap.add_argument("--out", default=os.path.join(HERE, "lava_preview.png"))
+    ap.add_argument("--fps", type=float, default=60.0)
+    ap.add_argument(
+        "--mode",
+        choices=("render", "motion", "sheet", "sweep"),
+        default="render",
+        help="render: albedo + G/R report. motion: per-frame change vs SPEED.",
+    )
     ap.add_argument("--settings", default=os.path.join(PACK, "lib", "settings.glsl"))
     args = ap.parse_args()
+
+    if args.mode == "motion":
+        return motion(args)
+    if args.mode == "sheet":
+        return sheet(args)
+    if args.mode == "sweep":
+        return sweep(args)
 
     cfg, enabled = read_settings(args.settings)
     print("lava_render: reading %s" % args.settings)
@@ -339,8 +353,88 @@ def main():
     return 0
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+def perframe(p, octaves, speed, fps):
+    """RMS of h(t+dt) - h(t), over the field's standard deviation."""
+    dt = 1.0 / fps
+    h0 = heat(p, 0.0, octaves)
+    h1 = heat(p, speed * dt, octaves)
+    return float(np.sqrt(((h1 - h0) ** 2).mean()) / h0.std())
+
+
+def motion(args):
+    """Per-frame change of the field, against LAVA_SPEED.
+
+    Added after the shipped LAVA_SPEED of 6.0 turned out to shimmer. The first
+    attempt measured a drift velocity with the structure function, which is exact
+    for an advected field, and came back nearly flat against SPEED - which looked
+    like a contradiction until the source was read again.
+
+    The reason is that a quarter of the accumulated field has its time term
+    *inside* a nested cosine:
+
+        col.g += cos(A - cos(B + t*i - ...));
+
+    so it modulates rather than translates. Modulation is what reads as shimmer,
+    and it scales linearly with SPEED while the translation barely moves. So the
+    measurement is per-frame change - which is independent of TILE and of the
+    normalisation, and proportional to what the eye actually sees.
+    """
+    cfg, _ = read_settings(args.settings)
+    span = args.span if args.span else 12.0
+    octaves = args.octaves
+    p = grid(args.size, span) / cfg["LAVA_TILE"]
+
+    print("motion: %d octaves at TILE %.2f, %.0f fps" % (octaves, cfg["LAVA_TILE"], args.fps))
+    print("\n  SPEED   changed per frame   reads as")
+    for speed in (0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 5.0, 6.0):
+        c = perframe(p, octaves, speed, args.fps)
+        if c < 0.012:
+            v = "barely moves"
+        elif c < 0.035:
+            v = "a drift you can follow"
+        elif c < 0.06:
+            v = "noticeable"
+        elif c < 0.12:
+            v = "busy"
+        else:
+            v = "SHIMMER"
+        mark = "  <- shipped" if abs(speed - cfg["LAVA_SPEED"]) < 1e-9 else ""
+        print("  %5.2f   %15.2f%%   %s%s" % (speed, 100 * c, v, mark))
+
+    print("\n  Why TILE=8 at SPEED 1.0 did not shimmer, at a much higher rate:")
+    rows = []
+    for TILE, oct, speed, label in (
+        (8.0, 16, 1.0, "old  TILE 8.0 oct 16"),
+        (cfg["LAVA_TILE"], octaves, cfg["LAVA_SPEED"], "new  shipped"),
+    ):
+        pp = grid(args.size, span) / TILE
+        c = perframe(pp, oct, speed, args.fps)
+        d = (span / args.size) / TILE
+        ox = np.zeros_like(pp)
+        ox[0] = d
+        oy = np.zeros_like(pp)
+        oy[1] = d
+        h = heat(pp, 0.0, oct)
+        g = np.maximum(
+            np.sqrt(
+                (heat(pp + ox, 0.0, oct) - h) ** 2 + (heat(pp + oy, 0.0, oct) - h) ** 2
+            )
+            / d,
+            1e-9,
+        )
+        rows.append((label, TILE, oct, speed, c, float(h.std() / np.median(g))))
+        print(
+            "    %-20s SPEED %4.1f: %6.2f%%/frame, feature width %.4f blocks"
+            % (label, speed, 100 * c, rows[-1][5])
+        )
+    if len(rows) == 2 and rows[1][5] > 0:
+        print(
+            "    -> the old one changed %.0fx faster per frame on features %.0fx\n"
+            "       smaller, so nearly all of that change fell below one pixel."
+            % (rows[0][4] / rows[1][4], rows[1][5] / rows[0][5])
+        )
+    return 0
+
 
 def sheet(args):
     """Contact sheet over (octaves, LAVA_TILE) at a fixed viewing distance.
@@ -494,3 +588,6 @@ def sweep(args):
               % (lv, 100.0 * float((heatv > 0.5).mean()), gr,
                  100.0 * float((h <= lv).mean())))
     return 0
+
+if __name__ == "__main__":
+    sys.exit(main())

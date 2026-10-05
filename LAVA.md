@@ -8,7 +8,7 @@ On the settings screen under **Lava**:
 | --- | --- | --- |
 | `LAVA` | on | The master switch. Off means the code is not compiled, not merely multiplied by zero. |
 | `LAVA_TILE` | 2.0 | How many blocks one unit of the source shader's uv spans. Sets plate size. |
-| `LAVA_SPEED` | 6.0 | Animation rate. |
+| `LAVA_SPEED` | 0.5 | Animation rate. See *Motion* below before touching it. |
 | `LAVA_CRUST_LEVEL` | 0.78 | The contour the cracks sit on. Higher means more crust. |
 | `LAVA_CRACK_WIDTH` | 0.05 | Half-width of that contour, **in blocks**. |
 | `LAVA_SEAM` | 0.45 | How much hotter a crack is than the melt around it. |
@@ -290,14 +290,63 @@ molten pixels. Two mistakes this file made and had to be told about:
   in the *preview*, not the shader: the harness built its wall grid with both
   axes a function of `y`. Worth knowing before trusting a preview.
 
+## Motion, and why the metric is not a velocity
+
+The first tuned version shipped `LAVA_SPEED 6.0` and was reported as shimmering.
+Two things had to be untangled, and the second one invalidated the first
+measurement I took.
+
+**A drift velocity is the wrong measurement.** The obvious approach is to track
+how fast the pattern translates, via the structure function — which is exact for
+an advected field, `v = -<(dh/dt)(dh/dx)> / <(dh/dx)^2>`. Measured that way the
+velocity barely moves with `LAVA_SPEED`: 0.0102 at 1.0 and 0.0114 at 6.0. That
+looked like a contradiction until the source was read again.
+
+Most of this shader's time dependence is **not** advection. Only some of it is:
+
+```glsl
+col.r += sin(x.x*2.0) * cos(x.y + t);                       // translates
+col.b += cos(x.x + x.y + t + cos(x.x - x.y) + t);            // translates, at 2t
+col.g += cos(x.x + x.y - cos(x.x - x.y + t*float(i) - ...)); // t*i is INSIDE a cos
+```
+
+That last one — a quarter of the accumulated field — has its time term nested
+inside another cosine, so it *modulates* rather than translates. Modulation is
+precisely what reads as shimmer, and it scales linearly with `LAVA_SPEED` while
+translation does not move much at all.
+
+**So the measurement is per-frame change**: the RMS of `h(t + 1/60) - h(t)` over
+the field's own standard deviation. TILE-independent, normalisation-independent,
+and directly proportional to what the eye sees. It is linear in `LAVA_SPEED`:
+
+| `LAVA_SPEED` | 0.25 | **0.5** | 1.0 | 1.5 | 3.0 | 6.0 |
+| --- | --- | --- | --- | --- | --- | --- |
+| field changed per frame | 1.6% | **3.1%** | 6.3% | 9.4% | 18.5% | 35.7% |
+
+`LAVA_SPEED` is now **0.5**, about 3% of the field per frame — a drift you can
+follow across the crust.
+
+**Why the original 1.0 was fine and is not now.** Measured per-frame change at the
+*old* settings (`LAVA_TILE` 8, 16 octaves, `SPEED` 1.0) was 27.6%, which by this
+metric is well into shimmer. It did not look like shimmer, because its feature
+width was **0.0049 blocks** — sub-centimetre. Almost all of that change was
+sub-pixel and averaged away before it reached the screen. The shipped
+configuration has a feature width of **0.031 blocks**, six times larger, so the
+same fractional change is six times more visible.
+
+That is the same lesson as the `LAVA_TILE` section, and it is the recurring trap
+in this file: **anything measured as a fraction of the field has to be converted
+to world units before it means anything**, because both the field's scale and
+the screen's change.
+
 ## Known limits
 
-- **No flow direction.** The only motion is the source's own `x.x += t/64`,
-  which compounds to `t/64 * 1.5^i` because the domain is scaled each pass, then
-  scales by `LAVA_TILE` to reach blocks. At the shipped defaults the coarsest
-  octave drifts 0.19 blocks/s and the finest 1.1 — a lazy creep, which is right
-  for a cooling pool and wrong for an active flow. Directional flow would need
-  the block's flow vector, which this engine does not hand to the shader.
+- **No flow direction.** The only motion is the source's own `x.x += t/64` plus
+  the `t`, `2t` and `t*i` phase terms above, and none of them know which way the
+  block is flowing. It reads as a slow boil rather than as a flow moving
+  downhill, which is right for a cooling pool and wrong for an active one.
+  Directional flow would need the block's flow vector, which this engine does not
+  hand to the shader.
 - **No heat haze.** Lava should shimmer the air above it. That wants a
   screen-space distortion driven by a volumetric sample, and it belongs to
   `composite`, not to a G-buffer pass.
