@@ -51,6 +51,67 @@
 
 #define SNELLS_WINDOW
 
+///////////////////////////////////////////////
+// ----- LAVA RELATED SETTINGS -----          //
+///////////////////////////////////////////////
+
+// Molten lava, in the opaque pass. lib/lava.glsl, wired into all_solid.fsh.
+// The field is a port of Shadertoy Dt33z7; see the head of that file and
+// LAVA.md. Every number below was measured with tools/lava_probe.py rather than
+// chosen by eye, and LAVA.md says which measurement each one came from.
+//
+// On by default, because a shaderpack that does lava is the reason to have it.
+// LAVA is the single switch and the code is not compiled when it is off, so it
+// costs nothing: see the note in lib/water_interaction.glsl for why that is
+// worth doing the same way here.
+#define LAVA
+
+// TILE is how many blocks one unit of the Shadertoy's uv spans. The original
+// spans one screen, so this is the only thing tying the pattern to the world.
+// Measured at TILE=8: the coarsest octave is a 25 block swirl and the level
+// that leaves 19% of the surface molten drifts at about 0.5 blocks/s.
+#define LAVA_TILE 8.0 // [2.0 3.0 4.0 6.0 8.0 12.0 16.0 24.0 32.0]
+
+// SPEED scales the animation. The original adds t/64 inside a loop that scales
+// the domain by 1.5 per pass, so the drift compounds to t/64 * 1.5^i: slow at
+// the coarse end and very fast at the fine end. 1.0 is the original's rate and
+// reads as a lazy crawl. There is no separate drift control because the
+// original has only the one.
+#define LAVA_SPEED 1.0 // [0.0 0.1 0.25 0.5 0.75 1.0 1.5 2.0 3.0 4.0]
+
+// CRUST_LEVEL is the contour the cracks sit on, and the only number here that
+// is a percentile of the field's distribution rather than a taste judgement.
+// Raising it means more crust. Measured fractions of the surface that end up
+// molten, at TILE=8:
+//
+//     0.45 -> 54%      0.60 -> 30%      0.75 -> 15%
+//     0.50 -> 45%      0.65 -> 24%      0.80 -> 11%
+//                   0.70 -> 19%  <- default
+//
+// p50 of the field is 0.472 and p75 is 0.642, so 0.70 sits between them and
+// leaves roughly a fifth of a pool molten, which is about what cooling lava
+// looks like from above.
+#define LAVA_CRUST_LEVEL 0.70 // [0.40 0.45 0.50 0.55 0.60 0.65 0.70 0.75 0.80 0.85 0.90 1.00 1.10]
+
+// CRACK_WIDTH is the half-width of that contour, in field units. At TILE=8 the
+// measured median |grad h| is 5.2 per block at 8 octaves and 15.4 at 16, so
+// 0.03 is a crack roughly 0.01 to 0.02 blocks across at full detail and about
+// six times that once the LOD has dropped the fine octaves. That range is
+// deliberate - it is what a crack does - but 0.0 is not a useful setting, it
+// just erases the network.
+#define LAVA_CRACK_WIDTH 0.03 // [0.005 0.01 0.02 0.03 0.04 0.06 0.08 0.12 0.16 0.24]
+
+// SEAM is how far the crack is taken up the heat ramp past the melt around it.
+// 0 makes the seams the same temperature as the pools they divide, which reads
+// as orange paint. 1 makes them the hottest thing on the surface, which reads
+// as lava. 0.65 is the point where they are clearly hotter without going white.
+#define LAVA_SEAM 0.65 // [0.0 0.2 0.4 0.65 0.8 1.0]
+
+// GLOW is a brightness lift on the whole surface. It is a multiplier on the
+// albedo and nothing else - it does not touch emission, which is EMISSIVE and
+// is set per block in all_solid.vsh. Raising it past 1.0 mostly buys bloom.
+#define LAVA_GLOW 1.0 // [0.5 0.75 1.0 1.25 1.5 2.0 2.5 3.0]
+
 ////////////////////////////////////////
 // ----- PLANT RELATED SETTINGS ----- //
 ////////////////////////////////////////

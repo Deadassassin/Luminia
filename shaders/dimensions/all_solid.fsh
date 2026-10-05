@@ -5,6 +5,7 @@
 #include "/lib/material_reflectance.glsl"
 #include "/lib/entities.glsl"
 #include "/lib/items.glsl"
+#include "/lib/lava.glsl"
 
 flat varying int NameTags;
 
@@ -448,6 +449,46 @@ void main() {
 		// IR Absorbsive? Dark.
 			Albedo.rgb = mix(Albedo.rgb, vec3(0.01, 0.08, 0.15), 0.5);
 		}
+		// Lava is an emitter and not a mirror, so it is left alone under
+		// aerochrome. That mode is meant to make the world monochrome, and an
+		// orange rock in it is still orange.
+	#endif
+
+	#ifdef LAVA
+		// Lava is ordinary opaque terrain, so it arrives here rather than in
+		// all_translucent, and this is the whole of the lava shading.
+		// lib/lava.glsl has the reasoning; the short version is that a deferred
+		// pack shades the face normal, and a lava surface's normal is a cube
+		// face, so there is no displaced normal here to perturb - the effect is
+		// albedo, plus the emission EMISSIVE already carries.
+		//
+		// Only for the world. The hand and the entity mesh both draw through this
+		// shader, and mc_Entity is a constant there rather than a block id, so
+		// blockID cannot mean BLOCK_LAVA in either. The same trap is described on
+		// the blockID read in lib/material_reflectance.glsl.
+		#ifdef WORLD
+		if (blockID == BLOCK_LAVA) {
+			// The world-space Y of the face normal. The field is a function of
+			// world XZ, so it only means anything on a face you look down on, and
+			// lavaSurface() fades the pattern out on anything else.
+			float upness = smoothstep(0.25, 0.75, viewToWorld(normal).y);
+
+			// The LOD needs the world-space size of a pixel, and fwidth() is
+			// undefined inside non-uniform control flow - a quad straddling the
+			// edge of a lava pool would read its neighbours' derivatives across
+			// that boundary. blockID is flat, so the branch is uniform per
+			// primitive but still not per quad, which is the case the spec warns
+			// about. The derivative is therefore taken out here, and only the
+			// cheap log() that turns it into an octave count happens inside.
+			Albedo.rgb = lavaSurface(
+				worldpos,
+				upness,
+				lavaOctaves(length(fwidth(worldpos.xz))),
+				frameTimeCounter * LAVA_SPEED
+			);
+			Albedo.a = 1.0;
+		}
+		#endif
 	#endif
 
 	#ifdef WORLD

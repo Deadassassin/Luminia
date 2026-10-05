@@ -276,6 +276,20 @@ void main() {
 	// normal block lightsources		
 	if(mc_Entity.x >= 100 && mc_Entity.x < 300) EMISSIVE = 0.5;
 	
+	// Lava is in that [100, 300) band already, so it is emissive at 0.5 and has
+	// been since before lib/lava.glsl existed. What the lava work changes is how
+	// bright: 0.5 is the value for a lit lamp, and a pool of molten rock next to
+	// one should not be dimmer than the lamp. LAVA_GLOW is shared with the albedo
+	// lift in all_solid.fsh so there is one dial for "how hot".
+	//
+	// 0.95 is the ceiling and not 1.0 on purpose. Emission() in composite1.fsh
+	// gates the whole emissive path on `Emission < 254.5/255.0`, so a lava pool
+	// set to 1.0 would fall out of the branch that makes it glow and end up
+	// *less* bright, not more. See LAVA.md.
+	#ifdef LAVA
+	if(mc_Entity.x == BLOCK_LAVA) EMISSIVE = 0.5 + 0.45 * clamp(LAVA_GLOW - 1.0, 0.0, 1.0);
+	#endif
+	
 	// special cases light lightning and beacon beams...	
 	#ifdef ENTITIES
 		if(entityId == ENTITY_LIGHTNING){
