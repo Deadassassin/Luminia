@@ -1,4 +1,4 @@
-# Penumbra's path tracer
+# Luminia's path tracer
 
 A stochastic screen-space path tracer, added to this pack and running on
 Vitrail's Vulkan backend. It replaces the pack's single-bounce screen-space
@@ -139,7 +139,7 @@ Three things were wrong with mode 4 as it stood:
   the reason is worth writing down. `colortex3` *is* what the lighting pass
   writes, and `composite5.fsh` reads it as "the current frame" — so it reads as
   the lit scene. But `dimensions/composite.fsh` runs immediately before the
-  lighting pass and overwrites `colortex3` with the **variable-penumbra shadow
+  lighting pass and overwrites `colortex3` with the **variable-luminia shadow
   buffer**: `minshadowfilt` in red, average depth in green, blocker count in
   blue. Read from inside the lighting pass, that is what arrives. Adding it to
   the indirect term is nonsense, and it presents as a wildly over-bright,
