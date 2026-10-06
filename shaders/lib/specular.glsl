@@ -77,10 +77,15 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 	spos.xy += TAA_Offset*texelSize*0.5/RENDER_SCALE;
 
 	// 1.0/quality is the same every iteration, and this loop runs once per
-	// pixel for up to `quality + 1` steps. Same for the 4.0 the texture
-	// coordinate is divided by below.
+	// pixel for up to `quality + 1` steps.
 	float stepReflect = 1.0 / quality;
-	vec2 texelStep = texelSize * 0.25;
+
+	// colortex4 is a quarter-resolution buffer, so going from normalised UV to
+	// a texel index means dividing by texelSize * 4.0. This has to be the
+	// RECIPROCAL of texelSize*4, not a multiple of texelSize/4: multiplying by
+	// texelSize shrinks the index toward zero instead of expanding it, and
+	// ivec2() then truncates every sample in the march to texel (0,0).
+	vec2 texelStep = 1.0 / (texelSize * 4.0);
 
   	for (int i = 0; i <= int(quality); i++) {
 
@@ -277,7 +282,12 @@ void DoSpecularReflections(
 				previousPosition = mat3(gbufferPreviousModelView) * previousPosition + gbufferPreviousModelView[3].xyz;
 				previousPosition.xy = projMAD(gbufferPreviousProjection, previousPosition).xy / -previousPosition.z * 0.5 + 0.5;
 		
-				if (previousPosition.x > 0.0 && previousPosition.y > 0.0 && previousPosition.x < 1.0 && previousPosition.x < 1.0) {
+				// Both axes have to be bounds-checked. This tested
+				// previousPosition.x twice and never tested .y, so a hit that
+				// reprojected below the bottom of the screen still took the
+				// branch and sampled colortex5 outside [0,1].
+				if (previousPosition.x > 0.0 && previousPosition.x < 1.0 &&
+				    previousPosition.y > 0.0 && previousPosition.y < 1.0) {
 					SS_Reflections.a = 1.0;
 					SS_Reflections.rgb = texture2DLod(colortex5, previousPosition.xy, LOD).rgb * Metals;
 				}

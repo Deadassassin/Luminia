@@ -222,12 +222,17 @@ vec3 rayTrace_GI(vec3 dir,vec3 position,float dither, float quality){
 	float maxZ = spos.z;
 
 	// The texel scale and the bias are both loop-invariant, and this loop runs
-	// `quality` times per pixel. Hoisting them to a multiply saves a divide per
-	// iteration in exchange for one up front. `quality` is not zero - it is a
-	// slider, and the loop below already divides by it on line 216.
+	// `quality` times per pixel. Hoisting them out saves a divide per iteration
+	// in exchange for one up front. `quality` is not zero - it is a slider, and
+	// the loop below already divides by it on line 216.
+	//
+	// Under UseQuarterResDepth this reads colortex4, which is quarter
+	// resolution (deferred1.fsh fetches the full-res depth buffer at
+	// gl_FragCoord.xy*4), so the UV -> texel scale is 1/(texelSize*4.0). The
+	// full-res branch reads depthtex1 instead, which is 1/texelSize.
 	float biasamount = 0.00005;
 	#ifdef UseQuarterResDepth
-		const vec2 depthStep = texelSize * 0.25;
+		const vec2 depthStep = 1.0 / (texelSize * 4.0);
 	#else
 		const vec2 depthStep = 1.0 / texelSize;
 	#endif
