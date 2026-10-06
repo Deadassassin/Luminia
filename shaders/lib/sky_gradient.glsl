@@ -94,10 +94,15 @@ vec4 texture2D_bicubic(sampler2D tex, vec2 uv)
 	vec2 p2 = (vec2(iuv.x + h0x, iuv.y + h1y) - 0.5) * texelSize.xy;
 	vec2 p3 = (vec2(iuv.x + h1x, iuv.y + h1y) - 0.5) * texelSize.xy;
 
-    return g0(fuv.y) * (g0x * texture2D(tex, p0)  +
-                        g1x * texture2D(tex, p1)) +
-           g1(fuv.y) * (g0x * texture2D(tex, p2)  +
-                        g1x * texture2D(tex, p3));
+    // g0(fuv.y) and g1(fuv.y) were each evaluated twice below. Hoisting them
+    // is exact - same argument, same call, evaluated once instead of twice.
+    float wy0 = g0(fuv.y);
+    float wy1 = g1(fuv.y);
+
+    return wy0 * (g0x * texture2D(tex, p0)  +
+                  g1x * texture2D(tex, p1)) +
+           wy1 * (g0x * texture2D(tex, p2)  +
+                  g1x * texture2D(tex, p3));
 }
 vec4 texture2D_bicubic_offset(sampler2D tex, vec2 uv, float noise, float scale)
 {
@@ -126,10 +131,13 @@ vec4 texture2D_bicubic_offset(sampler2D tex, vec2 uv, float noise, float scale)
 	vec2 p2 = (vec2(iuv.x + h0x, iuv.y + h1y) - 0.5) * (texelSize.xy);
 	vec2 p3 = (vec2(iuv.x + h1x, iuv.y + h1y) - 0.5) * (texelSize.xy);
 
-    return (g0(fuv.y) * (g0x * texture2D(tex, p0)  +
-                        g1x * texture2D(tex, p1)) +
-           g1(fuv.y) * (g0x * texture2D(tex, p2)  +
-                        g1x * texture2D(tex, p3)));
+    float wy0 = g0(fuv.y);
+    float wy1 = g1(fuv.y);
+
+    return (wy0 * (g0x * texture2D(tex, p0)  +
+                  g1x * texture2D(tex, p1)) +
+           wy1 * (g0x * texture2D(tex, p2)  +
+                  g1x * texture2D(tex, p3)));
 }
 
 vec2 sphereToCarte(vec3 dir) {

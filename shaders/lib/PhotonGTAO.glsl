@@ -107,9 +107,15 @@ float calculate_maximum_horizon_angle(
 	vec2 ray_step = (view_to_screen_space(view_pos + view_slice_dir * step_size, true) - screen_pos).xy;
 	vec2 ray_pos = screen_pos.xy + ray_step * (dither + max_of(view_pixel_size) * rcp_length(ray_step));
 
+	// view_res does not change between iterations, so hoisting the product out
+	// of the fetch below saves one vec2 multiply per sample. The clamp has to
+	// stay on ray_pos rather than on the scaled index: ray_pos is what the loop
+	// actually advances, and clamping the index instead would not be the same
+	// value once ray_pos leaves [0,1].
+	vec2 view_res_scaled = view_res * taau_render_scale;
 
 	for (int i = 0; i < GTAO_HORIZON_STEPS; ++i, ray_pos += ray_step) {
-		float depth = texelFetch2D(depthtex1, ivec2(clamp(ray_pos,0.0,1.0) * view_res * taau_render_scale - 0.5), 0).x;
+		float depth = texelFetch2D(depthtex1, ivec2(clamp(ray_pos,0.0,1.0) * view_res_scaled - 0.5), 0).x;
 
 		if (depth == 1.0 || depth < hand_depth || depth == screen_pos.z) continue;
 

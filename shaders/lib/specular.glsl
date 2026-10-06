@@ -75,9 +75,13 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 	float maxZ = spos.z;
 	
 	spos.xy += TAA_Offset*texelSize*0.5/RENDER_SCALE;
-	float depthcancleoffset = pow(1.0-(quality/reflection_quality),1.0);
 
-	float dist = 1.0 + clamp(position.z*position.z/50.0,0.0,2.0); // shrink sample size as distance increases
+	// 1.0/quality is the same every iteration, and this loop runs once per
+	// pixel for up to `quality + 1` steps. Same for the 4.0 the texture
+	// coordinate is divided by below.
+	float stepReflect = 1.0 / quality;
+	vec2 texelStep = texelSize * 0.25;
+
   	for (int i = 0; i <= int(quality); i++) {
 
 		// float sp = invLinZ(sqrt(texelFetch2D(colortex4,ivec2(spos.xy/texelSize/4.0),0).a/65000.0));
@@ -95,21 +99,19 @@ vec3 rayTraceSpeculars(vec3 dir, vec3 position, float dither, float quality, boo
 		// maxZ += stepv.z;
 
 
-		float sp = invLinZ(sqrt(texelFetch2D(colortex4,ivec2(spos.xy/texelSize/4.0),0).a/65000.0));
+		float sp = invLinZ(sqrt(texelFetch2D(colortex4,ivec2(spos.xy*texelStep),0).a/65000.0));
 
 		float currZ = linZ(spos.z);
-		float nextZ = linZ(sp);
 
 		// if(nextZ < currZ) {
-			if(abs(nextZ-currZ)/currZ < 0.15 && sp <= max(minZ,maxZ) && sp >= min(minZ,maxZ)) return vec3(spos.xy/RENDER_SCALE,sp);
+			if(abs(linZ(sp)-currZ)/currZ < 0.15 && sp <= max(minZ,maxZ) && sp >= min(minZ,maxZ)) return vec3(spos.xy/RENDER_SCALE,sp);
 		// }
-		float biasamount = 0.005;
-		minZ = maxZ-biasamount / linZ(spos.z);
+		minZ = maxZ-0.005 / currZ;
 		maxZ += stepv.z;
 
 		spos += stepv;
 
-		reflectLength += 1.0 / quality; // for shit
+		reflectLength += stepReflect; // for shit
   	}
   return vec3(1.1);
 }

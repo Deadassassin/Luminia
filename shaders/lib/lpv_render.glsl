@@ -4,7 +4,8 @@ const float LpvBlockBrightness = 1.0;
 
 float lpvCurve(float values) {
     // return values;
-    return pow(1.0 - sqrt(1.0-values), 2.0);
+    float k = 1.0 - sqrt(1.0-values);
+    return k * k;  // was pow(k, 2.0); the square is a multiply
 }
 
 vec4 SampleLpvLinear(const in vec3 lpvPos) {
@@ -23,9 +24,4 @@ vec4 SampleLpvLinear(const in vec3 lpvPos) {
 
 vec3 GetLpvBlockLight(const in vec4 lpvSample) {
     return LpvBlockBrightness * lpvSample.rgb;
-}
-
-float GetLpvSkyLight(const in vec4 lpvSample) {
-    float skyLight = saturate(lpvSample.a);
-    return skyLight*skyLight;
 }

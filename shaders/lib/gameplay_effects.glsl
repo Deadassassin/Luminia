@@ -48,7 +48,8 @@ void applyGameplayEffects(inout vec3 color, in vec2 texcoord, float noise){
 
     //////////////////////// DAMAGE DISTORTION /////////////////////
     #if defined LOW_HEALTH_EFFECT || defined DAMAGE_TAKEN_EFFECT   
-        float heartBeat = (pow(sin(frameTimeCounter * 15)*0.5+0.5,2.0)*0.2 + 0.1) ;
+        float pulse = sin(frameTimeCounter * 15) * 0.5 + 0.5;
+        float heartBeat = pulse * pulse * 0.2 + 0.1;  // was pow(pulse, 2.0)
         
         // apply low health distortion effects
         float damageDistortion = vignette * noise * heartBeat * threeHeart;

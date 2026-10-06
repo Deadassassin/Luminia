@@ -221,21 +221,29 @@ vec3 rayTrace_GI(vec3 dir,vec3 position,float dither, float quality){
 	float minZ = spos.z;
 	float maxZ = spos.z;
 
+	// The texel scale and the bias are both loop-invariant, and this loop runs
+	// `quality` times per pixel. Hoisting them to a multiply saves a divide per
+	// iteration in exchange for one up front. `quality` is not zero - it is a
+	// slider, and the loop below already divides by it on line 216.
+	float biasamount = 0.00005;
+	#ifdef UseQuarterResDepth
+		const vec2 depthStep = texelSize * 0.25;
+	#else
+		const vec2 depthStep = 1.0 / texelSize;
+	#endif
+
 	for(int i = 0; i < int(quality); i++){
 		if (spos.x < 0.0 || spos.y < 0.0 || spos.z < 0.0 || spos.x > 1.0 || spos.y > 1.0 || spos.z > 1.0) return vec3(1.1);
 
 		#ifdef UseQuarterResDepth
-			float sp = invLinZ(sqrt(texelFetch2D(colortex4,ivec2(spos.xy/texelSize/4),0).w/65000.0));
+			float sp = invLinZ(sqrt(texelFetch2D(colortex4,ivec2(spos.xy*depthStep),0).w/65000.0));
 		#else
-			float sp = texelFetch2D(depthtex1,ivec2(spos.xy/ texelSize),0).r;
+			float sp = texelFetch2D(depthtex1,ivec2(spos.xy*depthStep),0).r;
 		#endif
 
 		float currZ = linZ(spos.z);
-		float nextZ = linZ(sp);
 
-		if(nextZ < currZ && (sp <= max(minZ,maxZ) && sp >= min(minZ,maxZ))) return vec3(spos.xy/RENDER_SCALE,sp);
-		
-		float biasamount = 0.00005;
+		if(linZ(sp) < currZ && (sp <= max(minZ,maxZ) && sp >= min(minZ,maxZ))) return vec3(spos.xy/RENDER_SCALE,sp);
 
 		minZ = maxZ - biasamount / currZ;
 		maxZ += stepv.z;

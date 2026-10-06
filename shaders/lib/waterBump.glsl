@@ -85,7 +85,8 @@ vec3 getWaveNormal(vec3 posxz, bool isLOD){
 	float xDelta = (h1-h0)/deltaPos;
 	float yDelta = (h3-h0)/deltaPos;
 
-	vec3 wave = normalize(vec3(xDelta, yDelta,	1.0-pow(abs(xDelta+yDelta),2.0)));
+	float diag = abs(xDelta + yDelta);
+	vec3 wave = normalize(vec3(xDelta, yDelta, 1.0 - diag * diag));  // was pow(..., 2.0)
 
 	return wave;
 }
