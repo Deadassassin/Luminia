@@ -24,25 +24,12 @@ const float taau_render_scale = 1.0;
 #define max0(x) max(x, 0.0)
 #define min1(x) min(x, 1.0)
 
-float sqr(float x) { return x * x; }
-vec2  sqr(vec2  v) { return v * v; }
-vec3  sqr(vec3  v) { return v * v; }
-vec4  sqr(vec4  v) { return v * v; }
-
-float cube(float x) { return x * x * x; }
-
 float max_of(vec2 v) { return max(v.x, v.y); }
 float max_of(vec3 v) { return max(v.x, max(v.y, v.z)); }
 float max_of(vec4 v) { return max(v.x, max(v.y, max(v.z, v.w))); }
-float min_of(vec2 v) { return min(v.x, v.y); }
-float min_of(vec3 v) { return min(v.x, min(v.y, v.z)); }
-float min_of(vec4 v) { return min(v.x, min(v.y, min(v.z, v.w))); }
 
 float length_squared(vec2 v) { return dot(v, v); }
 float length_squared(vec3 v) { return dot(v, v); }
-
-vec2 normalize_safe(vec2 v) { return v == vec2(0.0) ? v : normalize(v); }
-vec3 normalize_safe(vec3 v) { return v == vec3(0.0) ? v : normalize(v); }
 
 float rcp_length(vec2 v) { return inversesqrt(dot(v, v)); }
 float rcp_length(vec3 v) { return inversesqrt(dot(v, v)); }

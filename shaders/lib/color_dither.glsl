@@ -23,24 +23,8 @@ vec3 fp10Dither(vec3 color,vec2 tc01){
 	return color + dither*exp2(-mantissaBits)*exp2(exponent);
 }
 
-vec3 fp16Dither(vec3 color,vec2 tc01){
-	float dither = triangWhiteNoise(tc01);
-	const vec3 mantissaBits = vec3(10.);
-	vec3 exponent = floor(log2(color));
-	return color + dither*exp2(-mantissaBits)*exp2(exponent);
-}
-
 vec3 int8Dither(vec3 color,vec2 tc01){
 	float dither = triangWhiteNoise(tc01);
 	return color + dither*exp2(-8.0);
 }
 
-vec3 int10Dither(vec3 color,vec2 tc01){
-	float dither = triangWhiteNoise(tc01);
-	return color + dither*exp2(-10.0);
-}
-
-vec3 int16Dither(vec3 color,vec2 tc01){
-	float dither = triangWhiteNoise(tc01);
-	return color + dither*exp2(-16.0);
-}

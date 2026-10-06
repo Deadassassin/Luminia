@@ -17,12 +17,6 @@ float lerp(float X, float Y, float A){
 	return X * (1.0 - A) + Y * A;
 }
 
-float square(float x){
-  return x*x;
-}
-
-
-
 vec3 toClipSpace3(vec3 viewSpacePosition) {
     return projMAD(gbufferProjection, viewSpacePosition) / -viewSpacePosition.z * 0.5 + 0.5;
 }
