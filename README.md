@@ -6,6 +6,7 @@ An edit of Bliss, which is itself an edit of Chocapic13's shaders.
 
 I wanted a more realistic Shader so I grabbed bliss as a base and removed and added content from other shader packs.
 
+I have considered, and I am working on stripping most stitched code from other shaders and rebuilding it, hopefully to avoid a copyright. I have checked many times with multiple AI and they have all said it should be ok, but of course it's AI I do not fully trust that with legals. I am hoping to get it done by 2027 🤷 (I'm very lazy)
 
 # UNSTABLE VERSION
 
