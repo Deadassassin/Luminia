@@ -1,4 +1,4 @@
-# Luminia v0.5b
+# Luminia_dev v0.6b
 
 An edit of Bliss, which is itself an edit of Chocapic13's shaders.
 
